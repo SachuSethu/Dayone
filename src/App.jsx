@@ -129,13 +129,14 @@ export default function App() {
   };
 
   // Step 3: Launch Live First-Day Simulation
-  const handleStartSimulation = () => {
+  const handleStartSimulation = (taskOverride = null) => {
     const liveSimData = buildSimulationMissionData({
       targetRole: selectedRole,
       candidateProfile,
       skillGaps,
       priorityGaps,
-      aiMission: generatedMission
+      aiMission: generatedMission,
+      assignedTask: taskOverride
     });
     setSimulationMissionData(liveSimData);
     setCurrentStage(APP_STAGES.SIMULATION);

@@ -581,9 +581,24 @@ ORDER BY billing_month DESC;`
 ];
 
 export function getSolutionByTaskId(taskId) {
-  return TASK_SOLUTIONS.find(s => s.id === taskId) || TASK_SOLUTIONS[0];
+  if (!taskId) return TASK_SOLUTIONS[0];
+  const direct = TASK_SOLUTIONS.find(s => s.id === taskId || s.missionCode === taskId);
+  if (direct) return direct;
+
+  // Prefix & keyword intelligent matching
+  const t = String(taskId).toLowerCase();
+  if (t.startsWith('fe-') || t.includes('front')) return getSolutionByRoleId('frontend');
+  if (t.startsWith('be-') || t.includes('back')) return getSolutionByRoleId('backend');
+  if (t.startsWith('fs-') || t.includes('full')) return getSolutionByRoleId('backend') || TASK_SOLUTIONS[0];
+  if (t.startsWith('sec-') || t.includes('cyber') || t.includes('sec')) return getSolutionByRoleId('cybersecurity');
+  if (t.startsWith('ux-') || t.includes('ui') || t.includes('design')) return getSolutionByRoleId('ui_ux');
+  if (t.startsWith('da-') || t.includes('data') || t.includes('anal')) return getSolutionByRoleId('data_analyst');
+
+  return TASK_SOLUTIONS[0];
 }
 
 export function getSolutionByRoleId(roleId) {
-  return TASK_SOLUTIONS.find(s => s.roleId === roleId || s.roleId.includes(roleId) || roleId?.includes(s.roleId)) || TASK_SOLUTIONS[0];
+  if (!roleId) return TASK_SOLUTIONS[0];
+  const r = String(roleId).toLowerCase();
+  return TASK_SOLUTIONS.find(s => s.roleId === r || s.roleId.includes(r) || r.includes(s.roleId)) || TASK_SOLUTIONS[0];
 }

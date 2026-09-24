@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DayOne.ai — Evaluator & Admin Task Guide & Solution Manual</title>
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --bg-card: #131c2e;
+      --bg-card-subtle: #1e293b;
+      --border-color: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-light: #818cf8;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --cyan: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 30px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header.admin-header {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px 30px;
+      margin-bottom: 25px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-titles h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .confidential-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      color: #fca5a5;
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-bottom: 6px;
+    }
+
+    .header-titles p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-print {
+      background: linear-gradient(135deg, var(--emerald) 0%, #059669 100%);
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+      transition: all 0.2s;
+    }
+
+    .btn-print:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+    }
+
+    /* Filters Bar */
+    .controls-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 25px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .filter-btn.active, .filter-btn:hover {
+      background: rgba(99, 102, 241, 0.18);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    /* Solution Guide Cards */
+    .solution-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 30px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+      padding-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .role-tag {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(99, 102, 241, 0.2);
+      color: var(--primary-light);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      display: inline-block;
+      margin-bottom: 6px;
+    }
+
+    .task-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .meta-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .meta-pill {
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--bg-card-subtle);
+      border: 1px solid var(--border-color);
+      padding: 4px 10px;
+      border-radius: 20px;
+      color: var(--cyan);
+    }
+
+    /* Overview Section */
+    .overview-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 22px;
+    }
+
+    .overview-title {
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin-bottom: 8px;
+    }
+
+    .overview-text {
+      font-size: 14px;
+      color: #cbd5e1;
+      margin-bottom: 12px;
+      line-height: 1.6;
+    }
+
+    .telemetry-list {
+      list-style: none;
+      background: rgba(0, 0, 0, 0.25);
+      border-left: 3px solid var(--rose);
+      padding: 10px 14px;
+      border-radius: 0 6px 6px 0;
+      font-family: monospace;
+      font-size: 12px;
+      color: #fda4af;
+      margin-top: 10px;
+    }
+
+    .telemetry-list li {
+      margin-bottom: 4px;
+    }
+
+    /* Steps Section */
+    .section-heading {
+      font-size: 15px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--cyan);
+      margin: 20px 0 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .steps-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+
+    .step-item {
+      background: var(--bg-card-subtle);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      gap: 14px;
+    }
+
+    .step-number {
+      background: var(--primary);
+      color: #fff;
+      font-weight: 800;
+      font-size: 12px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-content h4 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .step-content p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .step-tool {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--primary-light);
+      background: rgba(99, 102, 241, 0.15);
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+    }
+
+    /* Code Solution Box */
+    .code-box {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 22px;
+    }
+
+    .code-header {
+      background: #161b22;
+      padding: 8px 16px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #8b949e;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    pre code {
+      display: block;
+      padding: 16px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+      color: #e6edf3;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+
+    /* Checklist */
+    .checklist-box {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 8px;
+      padding: 16px 20px;
+    }
+
+    .checklist-box h4 {
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #6ee7b7;
+      margin-bottom: 10px;
+    }
+
+    .checklist-box ul {
+      list-style: none;
+    }
+
+    .checklist-box li {
+      font-size: 13px;
+      color: #d1fae5;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .checklist-box li::before {
+      content: '✔';
+      color: var(--emerald);
+      font-weight: bold;
+    }
+
+    /* PRINT MEDIA RULES */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        padding: 0;
+      }
+
+      .btn-print, .controls-bar {
+        display: none !important;
+      }
+
+      .admin-header, .solution-card {
+        border: 1px solid #ccc !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+        margin-bottom: 20px;
+      }
+
+      .task-title, .header-titles h1, .step-content h4 {
+        color: #000000 !important;
+      }
+
+      .code-box {
+        background: #f8fafc !important;
+        border: 1px solid #cbd5e1 !important;
+      }
+
+      pre code {
+        color: #0f172a !important;
+      }
+
+      .overview-box, .step-item, .checklist-box {
+        background: #f1f5f9 !important;
+        border-color: #cbd5e1 !important;
+        color: #0f172a !important;
+      }
+
+      .telemetry-list {
+        background: #fee2e2 !important;
+        color: #991b1b !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="admin-header">
+      <div class="header-titles">
+        <span class="confidential-badge">INTERNAL EVALUATOR ONLY • NOT ACCESSIBLE BY CANDIDATES</span>
+        <h1>DayOne.ai — Master Task Solutions & Evaluator Playbook</h1>
+        <p>Complete step-by-step resolution walkthroughs, production code solutions, telemetry alerts, and grading criteria for all roles.</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-print" onclick="window.print()">
+          <span>🖨️ Print / Save All as PDF</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Role Filter Navigation -->
+    <div class="controls-bar">
+      <button class="filter-btn active" onclick="filterRole('all', this)">All Roles (5 Solutions)</button>
+      <button class="filter-btn" onclick="filterRole('frontend', this)">Frontend Developer</button>
+      <button class="filter-btn" onclick="filterRole('backend', this)">Backend Developer</button>
+      <button class="filter-btn" onclick="filterRole('fullstack', this)">Full Stack Developer</button>
+      <button class="filter-btn" onclick="filterRole('cybersecurity', this)">Cybersecurity Analyst</button>
+      <button class="filter-btn" onclick="filterRole('ui_ux', this)">UI/UX Designer</button>
+      <button class="filter-btn" onclick="filterRole('data_analyst', this)">Data Analyst</button>
+    </div>
+
+    <!-- SOLUTION 1: FRONTEND DEVELOPER -->
+    <div class="solution-card" data-role="frontend">
+      <div class="card-top">
+        <div>
+          <span class="role-tag">Frontend Developer</span>
+          <h2 class="task-title">FE-CRIT-049: API Failure & Race Condition in Checkout Pipeline</h2>
+        </div>
+        <div class="meta-pills">
+          <span class="meta-pill">Level 2: Intermediate</span>
+          <span class="meta-pill">25 Mins</span>
+          <span class="meta-pill">P1 Revenue Impact</span>
+        </div>
+      </div>
+
+      <div class="overview-box">
+        <div class="overview-title">Problem Diagnosis & Root Cause</div>
+        <p class="overview-text">
+          Production checkout API calls fail intermittently under poor cellular network conditions (3G/4G), causing unhandled promise rejections, stuck UI loading spinners, and duplicate credit card charges. The checkout API client in <code>checkoutApi.js</code> lacks request timeouts and exponential retry backoff. When a network connection drops or receives a 504 Gateway Timeout, the promise rejects unhandled. Furthermore, <code>CheckoutButton.jsx</code> does not disable the submit button after an initial failure, causing users to tap repeatedly and submit duplicate charges. Lastly, currency calculations suffer from a floating-point precision error.
+        </p>
+        <ul class="telemetry-list">
+          <li>[14:02:11] Sentry Alert: Uncaught (in promise) Error: Gateway Timeout (504) at /api/v2/checkout</li>
+          <li>[14:02:15] Client Browser: TypeError: Cannot read properties of undefined (reading "transactionId")</li>
+          <li>[14:03:01] Customer Support Ticket #9812: "My card was charged twice when the spinner froze!"</li>
+        </ul>
+      </div>
+
+      <div class="section-heading">Step-by-Step Resolution Walkthrough</div>
+      <div class="steps-container">
+        <div class="step-item">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <span class="step-tool">Jira Tool</span>
+            <h4>Review the Bug Ticket in Jira</h4>
+            <p>Review ticket PROD-4092, observe the reproduction steps and error logs, and transition ticket to "In Progress".</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <span class="step-tool">Live Browser Preview</span>
+            <h4>Reproduce Error in Browser Preview</h4>
+            <p>Under simulated 3G latency, trigger checkout and verify that the button hangs in "Processing Payment..." without recovering.</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <span class="step-tool">Monaco Code Editor</span>
+            <h4>Patch checkoutApi.js with Exponential Backoff & Precision Handling</h4>
+            <p>Implement an exponential retry loop (3 attempts) with a 3500ms AbortController timeout, check <code>response.ok</code>, and fix currency rounding.</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <span class="step-tool">Dev Terminal</span>
+            <h4>Run Automated Unit & Regression Tests</h4>
+            <p>Execute <code>npm test</code> in the bash terminal and verify that all 4 test suites pass (100% green).</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-heading">Verified Reference Code Fix</div>
+      <div class="code-box">
+        <div class="code-header">src/services/checkoutApi.js</div>
+        <pre><code>// PRODUCTION SOLUTION: Resilient Checkout API with Retry & Timeout
+export async function submitCheckout(payload, maxRetries = 3) {
+  let attempt = 0;
+  let delay = 500; // base delay 500ms
+
+  while (attempt < maxRetries) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      const response = await fetch('/api/v2/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Checkout HTTP Error ${response.status}`);
+      }
+
+      const data = await response.json();
+      return { success: true, ...data };
+    } catch (err) {
+      attempt++;
+      if (attempt >= maxRetries) {
+        return {
+          success: false,
+          error: err.name === 'AbortError' ? 'Network timeout. Please retry.' : err.message,
+          retryExhausted: true
+        };
+      }
+      // Exponential backoff with jitter
+      await new Promise(res => setTimeout(res, delay + Math.random() * 200));
+      delay *= 2;
+    }
+  }
+}
+
+export function calculateCartTotal(items, discountCode) {
+  if (!items || !Array.isArray(items)) return 0;
+  const rawSum = items.reduce((acc, item) => acc + (Number(item.price) * Number(item.quantity)), 0);
+  let total = rawSum;
+  if (discountCode === 'DAYONE20') {
+    total = rawSum * 0.8;
+  }
+  // Fix IEEE 754 floating point rounding
+  return Math.round((total + Number.EPSILON) * 100) / 100;
+}</code></pre>
+      </div>
+
+      <div class="checklist-box">
+        <h4>Verification & Evaluation Checklist</h4>
+        <ul>
+          <li>Exponential backoff loop implemented (3 attempts with 500ms base delay)</li>
+          <li>AbortController aborts hanging fetch calls after 3500ms</li>
+          <li>Floating point currency calculation rounded safely with Math.round</li>
+          <li>Terminal test suite passes 100% with zero unhandled promise rejections</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- SOLUTION 2: CYBERSECURITY ANALYST -->
+    <div class="solution-card" data-role="cybersecurity">
+      <div class="card-top">
+        <div>
+          <span class="role-tag">Cybersecurity Analyst</span>
+          <h2 class="task-title">SEC-INC-942: Distributed Credential Stuffing & Gateway Brute-Force</h2>
+        </div>
+        <div class="meta-pills">
+          <span class="meta-pill">Level 2: Intermediate</span>
+          <span class="meta-pill">20 Mins</span>
+          <span class="meta-pill">P1 Active Intrusion</span>
+        </div>
+      </div>
+
+      <div class="overview-box">
+        <div class="overview-title">Problem Diagnosis & Root Cause</div>
+        <p class="overview-text">
+          High-volume distributed POST requests targeting <code>/api/v1/auth</code> with 401 response spikes across foreign autonomous systems (ASNs). Over 28,000 requests per minute with randomized User-Agents originating from ASN 41378 and ASN 50892. Attackers are rotating residential proxies to bypass per-IP rate limits.
+        </p>
+        <ul class="telemetry-list">
+          <li>[13:42:01] WAF Trigger: Rate limit exceeded on /api/v1/auth from ASN 41378 (Peak 2,850 RPS)</li>
+          <li>[13:42:18] SIEM Correlation: 98.4% 401 Unauthorized ratio across rogue subnets</li>
+          <li>[13:42:30] Threat Intel: IPs 185.220.101.0/24 flagged on TOR and Bulletproof exit lists</li>
+        </ul>
+      </div>
+
+      <div class="section-heading">Step-by-Step Resolution Walkthrough</div>
+      <div class="steps-container">
+        <div class="step-item">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <span class="step-tool">SIEM Log Analyzer</span>
+            <h4>Query Malicious CIDR Clusters</h4>
+            <p>Execute SIEM query: <code>status:401 AND endpoint:"/api/v1/auth/login" | stats count by client_ip, asn</code> to isolate rogue subnets.</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <span class="step-tool">SOC Bastion Shell</span>
+            <h4>Apply Persistent Firewall Drop Rules</h4>
+            <p>Execute iptables drop rules against rogue CIDR blocks: <code>iptables -I INPUT 1 -s 185.220.101.0/24 -j DROP</code> and <code>iptables -I INPUT 2 -s 45.154.255.88 -j DROP</code>.</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <span class="step-tool">Network Telemetry</span>
+            <h4>Verify Threat Containment</h4>
+            <p>Observe network telemetry chart to verify 401 spike drops from 2,850 RPS down to normal baseline (<10 RPS).</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-heading">Verified Bastion Commands & Rule Script</div>
+      <div class="code-box">
+        <div class="code-header">soc-bastion:/root/quarantine.sh</div>
+        <pre><code>#!/bin/bash
+# SEC-INC-942 Containment Script
+echo "Executing firewall drop rules for identified rogue subnets..."
+iptables -I INPUT 1 -s 185.220.101.0/24 -j DROP
+iptables -I INPUT 2 -s 45.154.255.88 -j DROP
+iptables -I INPUT 3 -s 194.26.29.112 -j DROP
+
+# Save persistent rules
+iptables-save > /etc/iptables/rules.v4
+
+# Verify drop rule counters increment
+iptables -L INPUT -v -n --line-numbers | head -n 10
+echo "Rogue CIDR quarantine active. Monitored RPS dropped to 8 RPS."</code></pre>
+      </div>
+
+      <div class="checklist-box">
+        <h4>Verification & Evaluation Checklist</h4>
+        <ul>
+          <li>Correctly isolated malicious ASNs (41378, 50892) and subnets in SIEM</li>
+          <li>Applied iptables DROP rules at line 1 before ACCEPT policies</li>
+          <li>Network telemetry confirms authorization fail rate normalized to baseline</li>
+          <li>Incident Ticket SEC-942 updated with IOC hashes and CISO notified</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- SOLUTION 3: UI/UX DESIGNER -->
+    <div class="solution-card" data-role="ui_ux">
+      <div class="card-top">
+        <div>
+          <span class="role-tag">UI/UX Designer</span>
+          <h2 class="task-title">UX-AUDIT-208: Mobile Checkout Drop-off & Form Friction Redesign</h2>
+        </div>
+        <div class="meta-pills">
+          <span class="meta-pill">Level 2: Intermediate</span>
+          <span class="meta-pill">25 Mins</span>
+          <span class="meta-pill">High Conversion Friction</span>
+        </div>
+      </div>
+
+      <div class="overview-box">
+        <div class="overview-title">Problem Diagnosis & Heuristic Friction</div>
+        <p class="overview-text">
+          Conversion drop-off at billing/shipping step is 38%. Usability recordings and survey feedback reveal frustration over undisclosed taxes until final click, confusing credit card error states, and unreadable gray-on-white text failing WCAG 2.1 AA contrast requirements. Tap targets on mobile are 32px (below Apple/Android 44px minimum).
+        </p>
+      </div>
+
+      <div class="section-heading">Step-by-Step Resolution Walkthrough</div>
+      <div class="steps-container">
+        <div class="step-item">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <span class="step-tool">Design Brief & User Feedback</span>
+            <h4>Synthesize Usability Pain Points</h4>
+            <p>Review 40 user feedback logs and identify top 3 friction drivers: Surprise Fees, Tiny Tap Targets, Low Contrast.</p>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <span class="step-tool">Interactive Design Canvas</span>
+            <h4>Configure Transparent, Accessible Layout Variant</h4>
+            <p>Switch layout to Variant B/C, enable upfront fee disclosure, set tap targets to 48px, and increase contrast ratio to 5.2:1.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="checklist-box">
+        <h4>Verification & Evaluation Checklist</h4>
+        <ul>
+          <li>Mobile touch targets increased to >= 44px (compliant with iOS/Android guidelines)</li>
+          <li>Color contrast ratio elevated to 4.5:1 minimum (WCAG 2.1 AA certified)</li>
+          <li>Transparent price breakdown placed before final confirmation step</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- SOLUTION 4: BACKEND DEVELOPER -->
+    <div class="solution-card" data-role="backend">
+      <div class="card-top">
+        <div>
+          <span class="role-tag">Backend Developer</span>
+          <h2 class="task-title">BE-L2-001: Connection Pool Exhaustion & Idle Connection Leak</h2>
+        </div>
+        <div class="meta-pills">
+          <span class="meta-pill">Level 2: Intermediate</span>
+          <span class="meta-pill">25 Mins</span>
+          <span class="meta-pill">P1 Database Bottleneck</span>
+        </div>
+      </div>
+
+      <div class="overview-box">
+        <div class="overview-title">Problem Diagnosis & Root Cause</div>
+        <p class="overview-text">
+          PostgreSQL database reaches 100% max connection limit (100/100) under sudden burst traffic. Node.js backend controllers open clients with <code>pool.connect()</code> inside try blocks but fail to call <code>client.release()</code> inside <code>finally</code> blocks on unhandled route rejections.
+        </p>
+      </div>
+
+      <div class="section-heading">Verified Reference Code Fix</div>
+      <div class="code-box">
+        <div class="code-header">src/db/connectionPool.js</div>
+        <pre><code>// PRODUCTION SOLUTION: Leak-Proof Connection Pool Wrapper
+import { Pool } from 'pg';
+
+export const pool = new Pool({
+  max: 20, // capped per container instance
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 3000
+});
+
+// Auto-releasing query helper
+export async function withTransaction(callback) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    // Guarantees release even on exception or timeout
+    client.release();
+  }
+}</code></pre>
+      </div>
+
+      <div class="checklist-box">
+        <h4>Verification & Evaluation Checklist</h4>
+        <ul>
+          <li>Every acquired database client is released in a mandatory finally block</li>
+          <li>Pool max connections capped according to Postgres max_connections budget</li>
+          <li>Idle timeout prevents orphaned client connections during traffic dips</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- SOLUTION 5: DATA ANALYST -->
+    <div class="solution-card" data-role="data_analyst">
+      <div class="card-top">
+        <div>
+          <span class="role-tag">Data Analyst</span>
+          <h2 class="task-title">DA-L2-001: Monthly Recurring Revenue (MRR) Ledger Reconciliation</h2>
+        </div>
+        <div class="meta-pills">
+          <span class="meta-pill">Level 2: Intermediate</span>
+          <span class="meta-pill">25 Mins</span>
+          <span class="meta-pill">Financial Reporting Audit</span>
+        </div>
+      </div>
+
+      <div class="overview-box">
+        <div class="overview-title">Problem Diagnosis & Root Cause</div>
+        <p class="overview-text">
+          A $48,000 monthly variance discovered between warehouse MRR tables and Stripe billing statements. SQL query was performing naive <code>DATE_TRUNC</code> using server local timezone instead of UTC, grouping end-of-month European subscriptions into the next month, and failed to filter out refunded transactions.
+        </p>
+      </div>
+
+      <div class="section-heading">Verified SQL Reconciliation Script</div>
+      <div class="code-box">
+        <div class="code-header">warehouse/queries/mrr_reconciliation.sql</div>
+        <pre><code>-- PRODUCTION SOLUTION: UTC Normalized MRR with Refund Deduplication
+WITH normalized_transactions AS (
+  SELECT 
+    customer_id,
+    amount_cents / 100.0 AS amount_usd,
+    DATE_TRUNC('month', transaction_timestamp AT TIME ZONE 'UTC') AS billing_month,
+    status,
+    is_refunded
+  FROM warehouse.raw_stripe_charges
+  WHERE 
+    is_refunded = FALSE
+    AND status = 'succeeded'
+    AND charge_type = 'recurring_subscription'
+)
+SELECT 
+  billing_month,
+  COUNT(DISTINCT customer_id) AS active_subscribers,
+  ROUND(SUM(amount_usd), 2) AS validated_mrr,
+  ROUND(SUM(amount_usd) - LAG(SUM(amount_usd), 1) OVER (ORDER BY billing_month), 2) AS net_mrr_expansion
+FROM normalized_transactions
+GROUP BY billing_month
+ORDER BY billing_month DESC;</code></pre>
+      </div>
+
+      <div class="checklist-box">
+        <h4>Verification & Evaluation Checklist</h4>
+        <ul>
+          <li>Timestamp cast to UTC prior to monthly date truncation</li>
+          <li>Refunded records (is_refunded = TRUE) filtered out of active revenue</li>
+          <li>Variance against Stripe billing ledger drops to exactly $0.00</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function filterRole(role, btn) {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const cards = document.querySelectorAll('.solution-card');
+      cards.forEach(card => {
+        if (role === 'all' || card.getAttribute('data-role') === role) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

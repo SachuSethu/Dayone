@@ -34,9 +34,6 @@ import UserFeedbackTool from './tools/designer/UserFeedbackTool';
 import ResearchNotesTool from './tools/designer/ResearchNotesTool';
 import ProjectBoardTool from './tools/designer/ProjectBoardTool';
 
-// Task Guide & Solution Playbook Modal
-import TaskGuideModal from './TaskGuideModal';
-
 // Generic Component Registry: Look up tool by ID
 const TOOL_COMPONENT_REGISTRY = {
   // Universal
@@ -117,7 +114,6 @@ export default function WorkspaceRenderer({
   // Countdown timer
   const [secondsRemaining, setSecondsRemaining] = useState(estimatedDurationMinutes * 60);
   const [latestToast, setLatestToast] = useState(null);
-  const [showTaskGuide, setShowTaskGuide] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -221,22 +217,12 @@ export default function WorkspaceRenderer({
           </div>
         </div>
 
-        {/* Center: Mission Timer, Task Guide & Event Trigger */}
+        {/* Center: Mission Timer & Event Trigger */}
         <div className="workspace-timer-box">
           <div className="timer-badge">
             <Clock size={15} className="text-warning" />
             <span className="timer-digits font-mono">{formatTime(secondsRemaining)}</span>
           </div>
-
-          <button 
-            type="button"
-            className="btn btn-task-guide"
-            onClick={() => setShowTaskGuide(true)}
-            title="Open Step-by-Step Task Guide & PDF Solution Manual"
-          >
-            <BookOpen size={14} className="guide-btn-icon" />
-            <span>Task Guide & Solution (PDF)</span>
-          </button>
 
           <button 
             className="btn btn-secondary btn-xs btn-event-sim"
@@ -338,15 +324,6 @@ export default function WorkspaceRenderer({
             <p className="toast-text">{latestToast.content}</p>
           </div>
         </div>
-      )}
-
-      {/* Task Guide & Solution Playbook Modal */}
-      {showTaskGuide && (
-        <TaskGuideModal
-          currentTaskId={missionData.taskType || missionData.missionCode || role.id}
-          currentRoleId={role.id}
-          onClose={() => setShowTaskGuide(false)}
-        />
       )}
     </div>
   );

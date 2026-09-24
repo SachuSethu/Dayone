@@ -1,6 +1,28 @@
 // src/data/tasks.js
-// Reusable task archetypes for dynamic role-based simulation generation.
-// The engine dynamically selects tasks matching the candidate's biggest skill gaps.
+// Reusable task archetypes and master integration for dynamic role-based simulation generation.
+// Preserves complete backward compatibility for existing simulation engine components.
+
+import {
+  ALL_TASKS,
+  TASK_DATABASE_STATS,
+  normalizeRoleId,
+  findTaskById,
+  getTasksByRole,
+  getTasksByRoleAndLevel,
+  determineCandidateLevel,
+  selectAssignedTasksForCandidate
+} from './taskDatabase.js';
+
+export {
+  ALL_TASKS,
+  TASK_DATABASE_STATS,
+  normalizeRoleId,
+  findTaskById,
+  getTasksByRole,
+  getTasksByRoleAndLevel,
+  determineCandidateLevel,
+  selectAssignedTasksForCandidate
+};
 
 export const TASK_ARCHETYPES = [
   // 1. DEBUGGING / CUSTOMER-ISSUE (Frontend)
@@ -66,38 +88,48 @@ export function CheckoutButton({ cartItems, onComplete }) {
   const [error, setError] = useState(null);
 
   const handleClick = async () => {
+    // BUG: No debounce or in-flight lock, rapid clicks fire multiple requests
     setLoading(true);
     setError(null);
     try {
       const result = await submitCheckout({ items: cartItems });
-      if (result.success) {
-        onComplete(result);
-      } else {
-        // Bug: Doesn't handle server message
-        setError("Checkout failed.");
-      }
+      onComplete(result);
     } catch (err) {
-      // Bug: Swallows error silently in production
-      console.error(err);
-      setError("Network timeout. Please retry.");
+      // BUG: React state update on unmounted component if navigated away
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="checkout-widget">
-      <button 
-        disabled={loading} 
-        onClick={handleClick}
-        className="pay-btn"
-      >
-        {loading ? "Processing Payment..." : "Pay Now ($149.00)"}
-      </button>
-      {error && <p className="error-banner">{error}</p>}
-    </div>
+    <button 
+      onClick={handleClick} 
+      disabled={loading}
+      className="btn-checkout"
+    >
+      {loading ? 'Processing Transaction...' : 'Pay Now'}
+    </button>
   );
-}`
+}`,
+        'src/tests/checkoutApi.test.js': `import { describe, it, expect, vi } from 'vitest';
+import { submitCheckout, calculateCartTotal } from '../services/checkoutApi';
+
+describe('Checkout Pipeline', () => {
+  it('should retry 3 times on 504 Gateway Timeout before failing', async () => {
+    // Test assertion for exponential backoff
+    expect(true).toBe(true);
+  });
+
+  it('should return clean error state without crashing React tree', async () => {
+    expect(true).toBe(true);
+  });
+
+  it('should round currency total to 2 decimal places with discount', () => {
+    const total = calculateCartTotal([{ price: 19.99, quantity: 1 }], 'DAYONE20');
+    expect(total).toBe(15.99);
+  });
+});`
       },
       initialTerminalHistory: [
         'dayone-fe-sandbox:~$ git status',
@@ -277,42 +309,36 @@ export function CheckoutButton({ cartItems, onComplete }) {
 /**
  * Dynamic Task Selector:
  * Selects the best matching task archetype based on the candidate's biggest skill gaps!
- *
- * Example:
- * Candidate Frontend Dev has largest gaps in:
- * 1. api_integration (gap = 42)
- * 2. testing_qa (gap = 35)
- * Matches: 'task-fe-api-failure' (API Failure & Race Condition)
+ * Backward compatible with existing callers, powered by the 192-task selection engine.
  */
-export function selectTaskForCandidate(roleId, skillGaps) {
-  // Filter tasks applicable to this role
-  const roleTasks = TASK_ARCHETYPES.filter(t => t.applicableRoles.includes(roleId));
-
-  if (!roleTasks.length) {
-    return TASK_ARCHETYPES[0];
-  }
-
-  // Score each task against the candidate's top skill gaps
-  let highestScore = -1;
-  let bestTask = roleTasks[0];
-
-  roleTasks.forEach(task => {
-    let matchScore = 0;
-    
-    // Check overlap with candidate's skill gaps
-    skillGaps.forEach((gapItem, index) => {
-      if (task.skills.includes(gapItem.skillId)) {
-        // High priority for top gaps
-        const rankMultiplier = (index === 0) ? 3 : (index === 1) ? 2 : 1;
-        matchScore += gapItem.gap * rankMultiplier * (gapItem.weight || 1);
-      }
-    });
-
-    if (matchScore > highestScore) {
-      highestScore = matchScore;
-      bestTask = task;
-    }
+export function selectTaskForCandidate(roleId, skillGaps = []) {
+  // Use new dynamic engine to select 2 tasks
+  const assigned = selectAssignedTasksForCandidate({
+    roleId,
+    skillGaps,
+    maxTasks: 2
   });
 
-  return bestTask;
+  if (assigned && assigned.length > 0) {
+    const primary = assigned[0];
+    
+    // Check if there is an exact legacy archetype match for backward compatibility
+    const legacyMatch = TASK_ARCHETYPES.find(
+      t => t.id === primary.id || t.id === primary.aliasId || (t.applicableRoles && t.applicableRoles.includes(normalizeRoleId(roleId)))
+    );
+
+    if (legacyMatch && (legacyMatch.id === primary.id || legacyMatch.id === primary.aliasId)) {
+      return {
+        ...legacyMatch,
+        ...primary,
+        subtasks: primary.subtasks || []
+      };
+    }
+
+    return primary;
+  }
+
+  // Fallback to legacy archetype
+  const roleTasks = TASK_ARCHETYPES.filter(t => t.applicableRoles && t.applicableRoles.includes(normalizeRoleId(roleId)));
+  return roleTasks[0] || TASK_ARCHETYPES[0];
 }

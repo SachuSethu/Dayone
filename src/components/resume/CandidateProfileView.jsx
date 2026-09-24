@@ -8,14 +8,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell
 } from 'recharts';
 import SkillDetailModal from './SkillDetailModal';
-import TaskGuideModal from '../TaskGuideModal';
 import { calculateEvidenceHistogram } from '../../lib/skills/gapEngine';
 import { 
   Sparkles, Target, Compass, Award, AlertTriangle, 
   ChevronRight, ArrowRight, Shield, CheckCircle2, TrendingUp, 
   Layers, Clock, HelpCircle, Eye, Play, BarChart3, RefreshCw,
-  GraduationCap, Briefcase, AlertOctagon, FileCode2, Info, BookOpen
+  GraduationCap, Briefcase, AlertOctagon, FileCode2, Info, BookOpen,
+  CheckSquare, Check
 } from 'lucide-react';
+import { 
+  selectAssignedTasksForCandidate, 
+  determineCandidateLevel 
+} from '../../data/taskDatabase';
 
 export default function CandidateProfileView({ 
   candidateProfile, 
@@ -28,7 +32,24 @@ export default function CandidateProfileView({
 }) {
   const [selectedSkillForModal, setSelectedSkillForModal] = useState(null);
   const [chartViewMode, setChartViewMode] = useState('radar'); // 'radar' | 'barchart' | 'histogram' | 'bars'
-  const [showTaskGuide, setShowTaskGuide] = useState(false);
+  const [activeAssignedIndex, setActiveAssignedIndex] = useState(0);
+
+  // Compute Candidate Experience Level (1..4)
+  const candidateLevel = determineCandidateLevel({
+    candidateProfile,
+    skillGaps
+  });
+
+  // Select EXACTLY 2 Assigned Main Tasks (each with 2 subtasks) enforcing Task Diversity Rule
+  const assignedTasks = selectAssignedTasksForCandidate({
+    roleId: targetRole?.id || 'frontend',
+    candidateLevel,
+    skillGaps,
+    candidateProfile,
+    maxTasks: 2
+  });
+
+  const activeTask = assignedTasks[activeAssignedIndex] || assignedTasks[0];
 
   // Prepare radar chart data
   const chartData = skillGaps.map(g => ({
@@ -693,7 +714,7 @@ export default function CandidateProfileView({
           </div>
         </section>
 
-        {/* SECTION 4: PERSONALIZED FIRST-DAY MISSION PREVIEW */}
+        {/* SECTION 4: DYNAMIC TASK INTELLIGENCE — 2 ASSIGNED TASKS */}
         <section className="profile-section-card mission-preview-section">
           <div className="mission-preview-glow" />
           
@@ -701,40 +722,79 @@ export default function CandidateProfileView({
             <div>
               <div className="section-pre-badge ai-mission-badge">
                 <Sparkles size={13} />
-                <span>AI SYNTHESIZED WORKPLACE MISSION</span>
+                <span>DYNAMIC TASK INTELLIGENCE • {activeTask?.levelLabel || `LEVEL ${candidateLevel}`}</span>
               </div>
-              <h2 className="section-title">Personalized First-Day Simulation</h2>
+              <h2 className="section-title">Personalized First-Day Simulation — 2 Assigned Tasks</h2>
               <p className="section-subtitle">
-                Tailored specifically to test and validate your #1 priority development area in a live production environment.
+                The AI dynamically matched exactly 2 production tasks from our 192-task database based on your resume evidence, verified strengths, and high-priority skill gaps.
               </p>
             </div>
 
             <div className="mission-meta-pills">
               <span className="meta-pill">
                 <Clock size={13} />
-                <span>{generatedMission?.estimatedMinutes || 45} mins</span>
+                <span>{activeTask?.estimatedMinutes || 25} mins</span>
               </span>
               <span className="meta-pill difficulty">
                 <Layers size={13} />
-                <span>{generatedMission?.difficulty || 'Intermediate'}</span>
+                <span>{activeTask?.levelLabel || `Level ${candidateLevel}`}</span>
+              </span>
+              <span className="meta-pill subtask-count-pill">
+                <CheckSquare size={13} />
+                <span>2 Subtasks</span>
               </span>
             </div>
           </div>
 
+          {/* TWO ASSIGNED TASKS SELECTOR / TABS */}
+          <div className="assigned-tasks-toggle-row">
+            {assignedTasks.map((t, idx) => (
+              <div 
+                key={t.id}
+                className={`assigned-task-tab-card ${activeAssignedIndex === idx ? 'active' : ''}`}
+                onClick={() => setActiveAssignedIndex(idx)}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="tab-card-header">
+                  <span className="task-order-badge">Assigned Task {idx + 1} of 2</span>
+                  <span className="task-competency-pill">{t.competency}</span>
+                </div>
+                <h4 className="tab-card-title">{t.title}</h4>
+                <p className="tab-card-rationale">
+                  <Target size={12} className="inline-icon text-amber" />
+                  <span>{t.matchingRationale}</span>
+                </p>
+              </div>
+            ))}
+          </div>
+
           <div className="mission-preview-body">
-            <h3 className="mission-headline-title">
-              {generatedMission?.title || `${targetRole.name} Production Mission`}
-            </h3>
+            <div className="mission-headline-row">
+              <div>
+                <span className="mission-code-badge">{activeTask?.id || activeTask?.missionDataTemplate?.missionCode}</span>
+                <h3 className="mission-headline-title">
+                  {activeTask?.title}
+                </h3>
+              </div>
+            </div>
+
+            {/* AI Matching Rationale Banner */}
+            <div className="mission-rationale-box">
+              <Sparkles size={16} className="text-amber" />
+              <div>
+                <strong>AI Task Matching Rationale:</strong> {activeTask?.matchingRationale || 'Targeted to validate priority competency areas.'}
+              </div>
+            </div>
 
             <p className="mission-scenario-narrative">
-              {generatedMission?.scenario || 
-                `A critical service component is experiencing edge-case failures during peak traffic. You must inspect telemetry logs, pinpoint the issue, and implement an error-handled fix.`}
+              {activeTask?.shortDescription || activeTask?.missionDataTemplate?.scenarioBrief || generatedMission?.scenario}
             </p>
 
             <div className="mission-skills-tested-row">
               <span className="skills-tested-label">Skills Tested in Simulation:</span>
               <div className="tested-pills-list">
-                {(generatedMission?.skillsTested || [targetRole.skills[0]?.name, 'Testing', 'API Integration']).map((sk, idx) => (
+                {(activeTask?.skills || generatedMission?.skillsTested || [targetRole.skills[0]?.name]).map((sk, idx) => (
                   <span key={idx} className="tested-pill">
                     {sk}
                   </span>
@@ -742,35 +802,62 @@ export default function CandidateProfileView({
               </div>
             </div>
 
-            <div className="mission-objective-callout">
-              <strong>Objective:</strong> {generatedMission?.objective || 'Investigate, fix, and pass regression tests.'}
+            {/* EXACTLY 2 SUBTASKS DISPLAY */}
+            <div className="assigned-subtasks-container">
+              <div className="subtasks-section-title">
+                <CheckSquare size={16} className="text-emerald" />
+                <span>Required Subtasks (2 Subtasks for this Mission)</span>
+              </div>
+
+              <div className="subtasks-grid">
+                {(activeTask?.subtasks || [
+                  { id: `${activeTask?.id}-A`, title: 'Root Cause Investigation', description: 'Inspect telemetry logs and isolate fault triggers.', verificationMethod: 'Automated test suite passes.', deliverables: ['Telemetry diagnosis', 'Reproduction trace'] },
+                  { id: `${activeTask?.id}-B`, title: 'Production Patch & Verification', description: 'Implement resilient code and pass all regression checks.', verificationMethod: 'Zero regression test runs.', deliverables: ['Code patch', 'Unit test assertions'] }
+                ]).map((st, sIdx) => (
+                  <div key={st.id || sIdx} className="subtask-card">
+                    <div className="subtask-card-header">
+                      <span className="subtask-step-pill">SUBTASK {sIdx === 0 ? 'A' : 'B'}</span>
+                      <h4 className="subtask-title">{st.title}</h4>
+                    </div>
+                    <p className="subtask-description">{st.description}</p>
+                    
+                    <div className="subtask-verification-box">
+                      <CheckCircle2 size={14} className="text-emerald" />
+                      <div>
+                        <strong>Verification:</strong> {st.verificationMethod}
+                      </div>
+                    </div>
+
+                    {st.deliverables && st.deliverables.length > 0 && (
+                      <div className="subtask-deliverables-row">
+                        <span className="deliverables-label">Deliverables:</span>
+                        <div className="deliverable-tags">
+                          {st.deliverables.map((d, dIdx) => (
+                            <span key={dIdx} className="deliverable-tag">{d}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Launch Primary CTA Button & Guide Manual Button */}
+            {/* Launch Primary CTA Button */}
             <div className="mission-launch-row">
               <div className="launch-context-note">
                 <CheckCircle2 size={16} className="text-emerald" />
-                <span>Workplace environment provisioned. Ready for immediate deployment.</span>
+                <span>Workplace environment provisioned for {activeTask?.title}. Ready for deployment.</span>
               </div>
 
               <div className="mission-cta-actions">
-                <button
-                  type="button"
-                  className="btn-preview-task-guide"
-                  onClick={() => setShowTaskGuide(true)}
-                  title="Open step-by-step resolution walkthrough and download printable PDF guide"
-                >
-                  <BookOpen size={16} />
-                  <span>Task Guide & Solution (PDF)</span>
-                </button>
-
                 <button 
                   type="button" 
                   className="btn-start-first-day"
-                  onClick={onStartSimulation}
+                  onClick={() => onStartSimulation && onStartSimulation(activeTask)}
                 >
                   <Play size={18} className="play-icon" />
-                  <span>START MY FIRST DAY</span>
+                  <span>START TASK {activeAssignedIndex + 1} SIMULATION</span>
                   <ArrowRight size={18} />
                 </button>
               </div>
@@ -786,17 +873,8 @@ export default function CandidateProfileView({
           onClose={() => setSelectedSkillForModal(null)}
           onTestSkill={() => {
             setSelectedSkillForModal(null);
-            onStartSimulation();
+            onStartSimulation && onStartSimulation(activeTask);
           }}
-        />
-      )}
-
-      {/* Interactive Task Guide & Solution Manual Modal */}
-      {showTaskGuide && (
-        <TaskGuideModal 
-          currentTaskId={generatedMission?.taskType}
-          currentRoleId={targetRole?.id}
-          onClose={() => setShowTaskGuide(false)}
         />
       )}
     </div>
