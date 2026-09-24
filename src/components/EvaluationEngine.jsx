@@ -1,222 +1,190 @@
 // src/components/EvaluationEngine.jsx
-import React, { useEffect, useState } from 'react';
+// DayOne.ai — Master Evaluation Engine implementing Steps 12 - 18
+// Step 12: AI Code Review (Technical & Workplace metrics)
+// Step 13: Partial pass / Edge case detection & 7-min Skill Sprint offer
+// Step 14: Micro-Learning Skill Sprint
+// Step 15: Try the Shift Again
+// Step 16: First-Day Report & Job Readiness %
+// Step 17: Verified Micro-Credential with Verify Modal
+// Step 18: DayOne Skill Passport (Verified & Developing skills)
+// Multi-Task & 4-Level Sequential Progression
+
+import React, { useEffect, useState, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   Award, CheckCircle2, Shield, TrendingUp, Sparkles, 
   ExternalLink, Share2, Download, ArrowRight, RotateCcw, 
-  Star, Briefcase, ChevronRight, FileCheck
+  Star, Briefcase, ChevronRight, FileCheck, AlertTriangle,
+  Zap, Clock, Bot, Check, PieChart, ShieldCheck, CheckSquare, X
 } from 'lucide-react';
 import { JOB_PROFILES } from '../data/jobs';
+import { calculateTaskEvaluation, getLevelInfo, getNextLevel } from '../lib/skills/statsEngine';
+import MicroCourseSkillSprint from './MicroCourseSkillSprint';
 
 export default function EvaluationEngine({ 
   missionData, 
   workspaceState, 
   onRetakeSimulation,
-  onSelectNewRole 
+  onSelectNewRole,
+  onProceedToNextTask,
+  onAdvanceToNextLevel,
+  taskIndex = 0,
+  totalTasksInLevel = 2,
+  currentLevel = 2
 }) {
-  const { role, candidateProfile, evaluationCriteria, skillGaps, taskType } = missionData;
+  const { role, candidateProfile, skillGaps, taskType } = missionData;
   const targetJobs = JOB_PROFILES[role.id] || [];
 
-  // Calculate scores based on criteria and workspace actions
-  const calculateResults = () => {
-    let earnedScore = 0;
-    let maxScore = 100;
-    const criteriaBreakdown = [];
+  // State for Step 14 Skill Sprint modal
+  const [showSkillSprint, setShowSkillSprint] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [sprintRemediated, setSprintRemediated] = useState(false);
 
-    if (role.id === 'frontend') {
-      // 1. Accuracy (30)
-      const acc = workspaceState?.feCodePatched ? 30 : 12;
-      earnedScore += acc;
-      criteriaBreakdown.push({
-        name: 'Root Cause Resolution & Async Handling',
-        earned: acc,
-        max: 30,
-        feedback: workspaceState?.feCodePatched 
-          ? 'Implemented exponential backoff retry and handled non-200 HTTP responses without unhandled rejections.'
-          : 'Partially identified 504 status, but retry loop was not fully instantiated.'
-      });
+  // Compute evaluation data using time-based stats engine
+  const evalData = useMemo(() => {
+    return calculateTaskEvaluation({
+      missionData,
+      workspaceState: {
+        ...workspaceState,
+        hasEdgeCaseFailure: sprintRemediated ? false : workspaceState?.hasEdgeCaseFailure
+      },
+      elapsedSeconds: workspaceState?.elapsedSeconds || 540,
+      candidateLevel: currentLevel,
+      hintsUsed: workspaceState?.workSignals?.hintsUsed || 0,
+      chaosResolved: workspaceState?.chaosResolved ?? true
+    });
+  }, [missionData, workspaceState, currentLevel, sprintRemediated]);
 
-      // 2. Resilience & Precision (25)
-      const res = workspaceState?.feCodePatched ? 25 : 10;
-      earnedScore += res;
-      criteriaBreakdown.push({
-        name: 'Financial Math & Precision Safety',
-        earned: res,
-        max: 25,
-        feedback: workspaceState?.feCodePatched
-          ? 'Correctly rounded floating point currency discounts using standard financial epsilon precision.'
-          : 'Currency calculations remained vulnerable to IEEE 754 precision artifacts.'
-      });
+  const levelInfo = getLevelInfo(currentLevel);
+  const nextLevel = getNextLevel(currentLevel);
 
-      // 3. Test Coverage (25)
-      const test = workspaceState?.testsPassed ? 25 : (workspaceState?.feCodePatched ? 22 : 8);
-      earnedScore += test;
-      criteriaBreakdown.push({
-        name: 'Automated Vitest Regression Verification',
-        earned: test,
-        max: 25,
-        feedback: workspaceState?.testsPassed
-          ? 'Executed `npm test` verifying 4/4 passing unit assertions including timeout aborts.'
-          : 'Automated test suite was not fully verified in terminal.'
-      });
-
-      // 4. Git & PR Communication (20)
-      const comm = workspaceState?.gitCommitted ? 20 : 16;
-      earnedScore += comm;
-      criteriaBreakdown.push({
-        name: 'Production Git Hygiene & PR Clarity',
-        earned: comm,
-        max: 20,
-        feedback: workspaceState?.gitCommitted
-          ? 'Opened atomic Pull Request with clear regression test summary.'
-          : 'Changes staged in working tree; ready for final push.'
-      });
-    } 
-    else if (role.id === 'cybersecurity') {
-      // 1. Detection (30)
-      const det = 30; // user reviewed logs
-      earnedScore += det;
-      criteriaBreakdown.push({
-        name: 'Anomaly Detection & SIEM Correlation',
-        earned: det,
-        max: 30,
-        feedback: 'Successfully isolated 401 surge signatures from ASN 41378 Tor exit relays.'
-      });
-
-      // 2. Containment Speed (30)
-      const cont = workspaceState?.threatContained ? 30 : 14;
-      earnedScore += cont;
-      criteriaBreakdown.push({
-        name: 'Firewall Containment & Kernel Isolation',
-        earned: cont,
-        max: 30,
-        feedback: workspaceState?.threatContained
-          ? 'Executed `iptables -A INPUT -s 185.220.101.0/24 -j DROP`, eliminating 2,850 RPS attack flood.'
-          : 'Containment command was not fully executed in bastion shell.'
-      });
-
-      // 3. Triage Reporting (25)
-      const triage = workspaceState?.threatContained ? 24 : 12;
-      earnedScore += triage;
-      criteriaBreakdown.push({
-        name: 'Incident Ticket Documentation & IOC Ledger',
-        earned: triage,
-        max: 25,
-        feedback: 'Logged malicious CIDR block and User-Agent signatures into official chain of custody.'
-      });
-
-      // 4. Hygiene & Recovery (15)
-      const hyg = workspaceState?.threatContained ? 15 : 8;
-      earnedScore += hyg;
-      criteriaBreakdown.push({
-        name: 'Network Telemetry Recovery Verification',
-        earned: hyg,
-        max: 15,
-        feedback: workspaceState?.threatContained
-          ? 'Verified network ingress telemetry returned to baseline safe threshold (140 req/sec).'
-          : 'Telemetry still indicates active anomalous ingress.'
-      });
-    } 
-    else { // UI/UX Designer
-      // 1. Research Synthesis (30)
-      const res = 30;
-      earnedScore += res;
-      criteriaBreakdown.push({
-        name: 'Qualitative Synthesis & Pain-Point Diagnosis',
-        earned: res,
-        max: 30,
-        feedback: 'Synthesized interview telemetry into clear friction drivers: hidden shipping fees and cramped touch targets.'
-      });
-
-      // 2. Heuristic Fixes (30)
-      const fix = workspaceState?.activeLayoutVariant === 'variant_b' ? 30 : 12;
-      earnedScore += fix;
-      criteriaBreakdown.push({
-        name: 'Fitts\'s Law & Touch Target Ergonomics',
-        earned: fix,
-        max: 30,
-        feedback: workspaceState?.activeLayoutVariant === 'variant_b'
-          ? 'Expanded mobile touch targets from 32px to 48px with 16px safety spacing buffer.'
-          : 'Retained sub-optimal 32px targets.'
-      });
-
-      // 3. WCAG AA Accessibility (20)
-      const a11y = workspaceState?.activeLayoutVariant === 'variant_b' ? 20 : 8;
-      earnedScore += a11y;
-      criteriaBreakdown.push({
-        name: 'WCAG 2.1 Level AA Color Contrast',
-        earned: a11y,
-        max: 20,
-        feedback: workspaceState?.activeLayoutVariant === 'variant_b'
-          ? 'Exceeded 4.5:1 ratio requirement with 5.8:1 high-contrast typography.'
-          : 'Failing AA contrast on gray inputs.'
-      });
-
-      // 4. Design Defense (20)
-      const def = workspaceState?.activeLayoutVariant === 'variant_b' ? 19 : 14;
-      earnedScore += def;
-      criteriaBreakdown.push({
-        name: 'Design System Token Spec & Lead Signoff',
-        earned: def,
-        max: 20,
-        feedback: 'Successfully defended upfront pricing transparency to mitigate 38.4% cart drop-off.'
-      });
-    }
-
-    return { totalScore: Math.min(100, earnedScore), criteriaBreakdown };
+  // Format MM:SS
+  const formatTime = (secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const results = calculateResults();
-  const certId = `D1-${role.id.toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
-
-  // Trigger celebration confetti
+  // Trigger celebration confetti on pass
   useEffect(() => {
-    if (results.totalScore >= 80) {
+    if (evalData.passed && !evalData.hasEdgeCaseFailure) {
       try {
         confetti({
-          particleCount: 100,
-          spread: 70,
+          particleCount: 110,
+          spread: 80,
           origin: { y: 0.6 }
         });
       } catch (err) {
-        // gracefully ignore if canvas not supported
+        // canvas ignore
       }
     }
-  }, [results.totalScore]);
+  }, [evalData.passed, evalData.hasEdgeCaseFailure]);
+
+  const candidateDisplayName = candidateProfile?.name || 'Sachu Sethu';
 
   return (
     <div className="evaluation-engine-container">
-      {/* Top Banner */}
+      {/* STEP 13: ALMOST THERE / EDGE CASE DETECTION BANNER */}
+      {evalData.hasEdgeCaseFailure && !sprintRemediated && (
+        <div className="step13-edgecase-banner animate-slide-in">
+          <div className="edgecase-banner-left">
+            <div className="edgecase-icon-pulse">
+              <AlertTriangle size={24} className="text-amber" />
+            </div>
+            <div>
+              <div className="edgecase-badge">
+                <span>STEP 13 — PRODUCTION EDGE CASE DETECTED</span>
+              </div>
+              <h2 className="edgecase-title">Almost there.</h2>
+              <p className="edgecase-desc">
+                Your implementation solved the main issue, but we found one production edge case:
+                <strong> {evalData.edgeCaseDetails.description}</strong>
+              </p>
+              <div className="missing-skill-pill">
+                <span>Missing Skill: <strong>{evalData.edgeCaseDetails.skill}</strong></span>
+                <span className="dot-sep">•</span>
+                <span>Current capability: <strong>{evalData.edgeCaseDetails.currentCapability}%</strong></span>
+                <span className="dot-sep">•</span>
+                <span>Required for role: <strong>{evalData.edgeCaseDetails.requiredCapability}%</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <div className="edgecase-banner-right">
+            <button 
+              type="button"
+              className="btn-fix-gap-sprint"
+              onClick={() => setShowSkillSprint(true)}
+            >
+              <Zap size={16} />
+              <span>Fix the Gap (7-min Skill Sprint)</span>
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Top Banner (Step 16: First-Day Report) */}
       <div className="eval-hero-banner">
         <div className="eval-hero-content">
           <div className="flex-row items-center gap-2 mb-2">
             <span className="badge-pill">
               <Sparkles size={14} className="text-warning" />
-              <span>DayOne Automated Simulation Evaluation</span>
+              <span>DayOne Automated Workplace Review</span>
+            </span>
+            <span className="task-seq-pill">
+              Task {taskIndex + 1} of {totalTasksInLevel} ({levelInfo.name} Level)
             </span>
           </div>
 
           <h1 className="eval-hero-title">
-            {results.totalScore >= 80 ? 'Simulation Passed with Distinction!' : 'Simulation Completed'}
+            {evalData.passed 
+              ? 'SHIFT COMPLETE — Your First-Day Report' 
+              : 'Shift Evaluation — Actionable Production Review'}
           </h1>
           <p className="eval-hero-sub">
-            Candidate <strong>{candidateProfile.name}</strong> successfully resolved the {role.name} incident ({missionData.missionCode}).
+            Evaluated against live production benchmarks for <strong>{role.name}</strong> ({missionData.missionCode}).
           </p>
+
+          {/* Time Efficiency Metric Strip */}
+          <div className="time-efficiency-strip">
+            <div className="time-strip-item">
+              <Clock size={14} className="text-amber" />
+              <span>Time Taken: <strong>{formatTime(evalData.timePerformance.elapsedSeconds)}</strong></span>
+              <span className="time-target-text">/ {formatTime(evalData.timePerformance.targetSeconds)} SLA target</span>
+            </div>
+            <div className={`time-speed-badge ${evalData.timePerformance.speedTier}`}>
+              {evalData.timePerformance.speedTier === 'rapid' || evalData.timePerformance.speedTier === 'fast' ? (
+                <span>⚡ +18% Speed & Velocity Bonus Applied</span>
+              ) : evalData.timePerformance.speedTier === 'delayed' ? (
+                <span>⚠️ Extended Duration: High completion time reduced statistical gain</span>
+              ) : (
+                <span>✓ Standard Sprint Velocity</span>
+              )}
+            </div>
+          </div>
         </div>
 
+        {/* Big Overall Job Readiness Orb */}
         <div className="eval-score-orb">
           <div className="orb-circle">
-            <span className="orb-score font-mono">{results.totalScore}</span>
-            <span className="orb-denom">/ 100</span>
+            <span className="orb-score font-mono">{evalData.totalScore}%</span>
+            <span className="orb-denom">Readiness</span>
           </div>
-          <span className="orb-percentile">Top 4% Candidate Cohort</span>
+          <span className="orb-percentile">
+            {evalData.totalScore >= levelInfo.minCreditToPass 
+              ? `✓ Passed ${levelInfo.name} Requirement (${levelInfo.minCreditToPass}%)`
+              : `⚠️ Under Required Minimum (${levelInfo.minCreditToPass}%)`}
+          </span>
         </div>
       </div>
 
-      {/* Main Grid: Credential + Criteria Breakdown */}
+      {/* Main Grid: Credential & Passport + Rubric Review */}
       <div className="eval-content-grid">
-        {/* Left Column: Official DayOne Verified Credential */}
+        {/* Left Column: Official DayOne Verified Micro-Credential & Skill Passport */}
         <div className="eval-col-credential">
+          
+          {/* STEP 17: VERIFIED MICRO-CREDENTIAL CARD */}
           <div className="official-credential-card">
             <div className="credential-watermark">DAYONE.AI VERIFIED</div>
             
@@ -224,35 +192,26 @@ export default function EvaluationEngine({
               <div className="flex-row items-center gap-2">
                 <div className="cert-logo-badge">D1</div>
                 <div>
-                  <h4 className="cert-org-name">DayOne.ai Simulation Institute</h4>
-                  <span className="cert-type-label">Role-Based Competency Certificate</span>
+                  <span className="cert-type-label">🏅 VERIFIED MICRO-CREDENTIAL</span>
+                  <h4 className="cert-org-name">{missionData.competency || `${role.name} Production Debugging`}</h4>
                 </div>
               </div>
-              <Shield size={24} className="text-accent" />
+              <ShieldCheck size={26} className="text-emerald" />
             </div>
 
             <div className="credential-card-body">
-              <p className="cert-grant-text">This verifiable credential certifies that</p>
-              <h2 className="cert-recipient-name">{candidateProfile.name}</h2>
-              <p className="cert-achievement-text">
-                has successfully demonstrated production-grade workplace mastery in
-              </p>
-              <h3 className="cert-role-title font-semibold text-accent">
-                {role.name} // {taskType.toUpperCase()}
-              </h3>
-
               <div className="cert-meta-grid">
                 <div className="cert-meta-item">
                   <span className="cert-meta-label">Credential ID:</span>
-                  <span className="cert-meta-val font-mono">{certId}</span>
+                  <span className="cert-meta-val font-mono text-cyan">{evalData.credentialId}</span>
                 </div>
                 <div className="cert-meta-item">
-                  <span className="cert-meta-label">Verified Score:</span>
-                  <span className="cert-meta-val font-mono text-success">{results.totalScore} / 100</span>
+                  <span className="cert-meta-label">Assessment:</span>
+                  <span className="cert-meta-val">Workplace Simulation</span>
                 </div>
                 <div className="cert-meta-item">
-                  <span className="cert-meta-label">Evaluator:</span>
-                  <span className="cert-meta-val">{role.aiLead.name}</span>
+                  <span className="cert-meta-label">Status:</span>
+                  <span className="cert-meta-val font-bold text-emerald">✓ VERIFIED</span>
                 </div>
                 <div className="cert-meta-item">
                   <span className="cert-meta-label">Issued:</span>
@@ -260,28 +219,29 @@ export default function EvaluationEngine({
                 </div>
               </div>
 
-              <div className="cert-badge-row">
-                <div className="mastery-badge">
-                  <Award size={14} className="text-warning" />
-                  <span>Production Ready</span>
-                </div>
-                <div className="mastery-badge">
-                  <CheckCircle2 size={14} className="text-success" />
-                  <span>Deficit Resolved</span>
+              <div className="cert-demonstrated-block">
+                <div className="block-title">Demonstrated Capabilities:</div>
+                <div className="demonstrated-tags-grid">
+                  {evalData.demonstratedCapabilities.map((cap, i) => (
+                    <span key={i} className="dem-tag">✓ {cap}</span>
+                  ))}
                 </div>
               </div>
             </div>
 
             <div className="credential-card-footer">
               <button 
-                className="btn btn-secondary btn-sm"
-                onClick={() => alert(`Credential ${certId} link copied to clipboard!`)}
+                type="button"
+                className="btn btn-verify-cred"
+                onClick={() => setShowVerifyModal(true)}
               >
-                <Share2 size={14} />
-                <span>Share Credential</span>
+                <ShieldCheck size={14} />
+                <span>Verify Credential</span>
               </button>
+
               <button 
-                className="btn btn-primary btn-sm"
+                type="button"
+                className="btn btn-secondary btn-sm"
                 onClick={() => window.print()}
               >
                 <Download size={14} />
@@ -290,71 +250,160 @@ export default function EvaluationEngine({
             </div>
           </div>
 
+          {/* STEP 18: MY DAYONE SKILL PASSPORT */}
+          <div className="skill-passport-card mt-4">
+            <div className="passport-header">
+              <div className="passport-avatar">🪪</div>
+              <div>
+                <h4 className="passport-name">{candidateDisplayName}</h4>
+                <span className="passport-role-tag">{role.name}</span>
+              </div>
+              <div className="passport-readiness-pill font-mono">
+                {evalData.totalScore}%
+              </div>
+            </div>
+
+            <div className="passport-job-readiness-bar">
+              <div className="bar-labels">
+                <span>JOB READINESS</span>
+                <span className="font-mono text-emerald">{evalData.totalScore}%</span>
+              </div>
+              <div className="readiness-track">
+                <div className="readiness-fill" style={{ width: `${evalData.totalScore}%` }} />
+              </div>
+            </div>
+
+            {/* Verified Skills (>= 75%) */}
+            <div className="passport-skills-section">
+              <div className="section-title text-emerald">
+                <CheckCircle2 size={14} />
+                <span>VERIFIED SKILLS</span>
+              </div>
+              <div className="passport-skills-list">
+                {evalData.skillImprovements.filter(s => s.after >= 75).map(s => (
+                  <div key={s.skill} className="passport-skill-row">
+                    <span className="skill-name">✓ {s.skill}</span>
+                    <span className="skill-pct font-mono text-emerald">{s.after}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Developing Skills (< 75%) */}
+            <div className="passport-skills-section developing">
+              <div className="section-title text-amber">
+                <span className="half-circle">◐</span>
+                <span>DEVELOPING</span>
+              </div>
+              <div className="passport-skills-list">
+                {evalData.skillImprovements.filter(s => s.after < 75).map(s => (
+                  <div key={s.skill} className="passport-skill-row">
+                    <span className="skill-name">◐ {s.skill}</span>
+                    <span className="skill-pct font-mono text-amber">{s.after}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* Skill Gap Progression (Before vs After) */}
           <div className="skill-progression-card mt-4">
             <h4 className="progression-title">
               <TrendingUp size={18} className="text-accent" />
-              <span>Skill Deficit Remediation Results</span>
+              <span>Statistical Improvement (Based on Velocity & Accuracy)</span>
             </h4>
             <div className="progression-items-list">
-              {skillGaps.slice(0, 3).map(gap => {
-                const improvedScore = Math.min(95, gap.candidateScore + Math.round(results.totalScore * 0.45));
-                return (
-                  <div key={gap.skillId} className="progression-row">
-                    <div className="flex-row justify-between text-sm mb-1">
-                      <span className="font-semibold text-white">{gap.name}</span>
-                      <div className="flex-row items-center gap-2">
-                        <span className="text-muted line-through text-xs">{gap.candidateScore}%</span>
-                        <span className="text-success font-bold text-sm">→ {improvedScore}%</span>
-                        <span className="badge-pill-xs font-semibold text-success">
-                          +{improvedScore - gap.candidateScore}% Gain
-                        </span>
-                      </div>
-                    </div>
-                    <div className="progression-bar-track">
-                      <div className="progression-old-fill" style={{ width: `${gap.candidateScore}%` }}></div>
-                      <div className="progression-new-fill" style={{ width: `${improvedScore}%` }}></div>
+              {evalData.skillImprovements.map(item => (
+                <div key={item.skill} className="progression-row">
+                  <div className="flex-row justify-between text-sm mb-1">
+                    <span className="font-semibold text-white">{item.skill}</span>
+                    <div className="flex-row items-center gap-2">
+                      <span className="text-muted line-through text-xs">{item.before}%</span>
+                      <span className="text-success font-bold text-sm">→ {item.after}%</span>
+                      <span className="badge-pill-xs font-semibold text-success">
+                        +{item.gain}% Gain
+                      </span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Criteria Rubric Breakdown & Target Jobs */}
-        <div className="eval-col-details">
-          {/* Rubric Breakdown */}
-          <div className="rubric-card">
-            <h4 className="rubric-title">
-              <FileCheck size={18} className="text-accent" />
-              <span>Evaluation Rubric & Actionable Feedback</span>
-            </h4>
-
-            <div className="rubric-items-list">
-              {results.criteriaBreakdown.map((item, i) => (
-                <div key={i} className="rubric-item">
-                  <div className="rubric-item-header">
-                    <span className="rubric-item-name font-semibold text-white">{item.name}</span>
-                    <span className="rubric-item-score font-mono text-accent">
-                      {item.earned} / {item.max} pts
-                    </span>
+                  <div className="progression-bar-track">
+                    <div className="progression-old-fill" style={{ width: `${item.before}%` }}></div>
+                    <div className="progression-new-fill" style={{ width: `${item.after}%` }}></div>
                   </div>
-                  <p className="rubric-feedback-text">{item.feedback}</p>
                 </div>
               ))}
             </div>
           </div>
+        </div>
 
-          {/* AI Lead Signoff Quote */}
+        {/* Right Column: Step 12 AI Code Review & Multi-Task Sequential Progression */}
+        <div className="eval-col-details">
+          
+          {/* STEP 12: TECHNICAL & WORKPLACE REVIEW CARD */}
+          <div className="ai-code-review-card">
+            <div className="card-header-badge">
+              <FileCheck size={18} className="text-accent" />
+              <h3 className="card-heading">STEP 12 — 🔎 AI CODE REVIEW</h3>
+            </div>
+
+            <div className="reviews-split-grid">
+              {/* Technical Review */}
+              <div className="review-subcard">
+                <h4 className="subcard-title text-cyan">TECHNICAL REVIEW</h4>
+                <div className="metrics-list">
+                  <div className="metric-row">
+                    <span>Code correctness</span>
+                    <span className="metric-val font-mono">{evalData.technicalReview.codeCorrectness}%</span>
+                  </div>
+                  <div className="metric-row">
+                    <span>Edge cases</span>
+                    <span className={`metric-val font-mono ${evalData.hasEdgeCaseFailure ? 'text-amber' : ''}`}>
+                      {evalData.technicalReview.edgeCases}%
+                    </span>
+                  </div>
+                  <div className="metric-row">
+                    <span>Architecture</span>
+                    <span className="metric-val font-mono">{evalData.technicalReview.architecture}%</span>
+                  </div>
+                  <div className="metric-row">
+                    <span>Debugging</span>
+                    <span className="metric-val font-mono">{evalData.technicalReview.debugging}%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Workplace Review */}
+              <div className="review-subcard">
+                <h4 className="subcard-title text-emerald">WORKPLACE REVIEW</h4>
+                <div className="metrics-list">
+                  <div className="metric-row">
+                    <span>Communication</span>
+                    <span className="metric-val font-mono">{evalData.workplaceReview.communication}%</span>
+                  </div>
+                  <div className="metric-row">
+                    <span>Problem solving</span>
+                    <span className="metric-val font-mono">{evalData.workplaceReview.problemSolving}%</span>
+                  </div>
+                  <div className="metric-row">
+                    <span>Prioritization</span>
+                    <span className="metric-val font-mono">{evalData.workplaceReview.prioritization}%</span>
+                  </div>
+                  <div className="metric-row">
+                    <span>Coachability</span>
+                    <span className="metric-val font-mono">{evalData.workplaceReview.coachability}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* AI Lead Quote */}
           <div className="ai-lead-signoff-card mt-4">
             <div className="lead-avatar-sm">{role.aiLead.avatar}</div>
             <div className="signoff-content">
               <h5 className="signoff-author">{role.aiLead.name} ({role.aiLead.title})</h5>
               <p className="signoff-quote">
-                "{candidateProfile.name} exhibited exceptional technical intuition during this simulation. 
-                Addressing the root cause rather than applying a cosmetic patch demonstrates the exact engineering hygiene 
-                we look for in Tier-1 hires."
+                "{candidateDisplayName} demonstrated authentic engineering problem-solving. 
+                Investigating root cause state dependencies, communicating under sudden chaos events, and ensuring test assertions pass represents the exact day-one readiness employers test for."
               </p>
             </div>
           </div>
@@ -364,7 +413,7 @@ export default function EvaluationEngine({
             <div className="flex-row justify-between items-center mb-3">
               <h4 className="jobs-title">
                 <Briefcase size={18} className="text-accent" />
-                <span>Job Openings Aligned with this Credential</span>
+                <span>Job Openings Unlocked by this Credential</span>
               </h4>
               <span className="text-xs text-muted">Direct Hiring Partner Fast-Track</span>
             </div>
@@ -379,8 +428,9 @@ export default function EvaluationEngine({
                   </div>
 
                   <button 
+                    type="button"
                     className="btn btn-secondary btn-xs"
-                    onClick={() => alert(`Application submitted for ${job.title} at ${job.company} with verified DayOne Credential!`)}
+                    onClick={() => alert(`Application fast-tracked for ${job.title} at ${job.company} with verified DayOne Credential ${evalData.credentialId}!`)}
                   >
                     <span>Fast-Track Apply</span>
                     <ChevronRight size={13} />
@@ -390,20 +440,162 @@ export default function EvaluationEngine({
             </div>
           </div>
 
-          {/* Navigation Action Buttons */}
+          {/* Multi-Task Sequential Progression Footer Actions */}
           <div className="eval-footer-nav mt-4">
-            <button className="btn btn-secondary" onClick={onRetakeSimulation}>
+            {/* If task 1 of 2: Proceed to Task 2 */}
+            {taskIndex < totalTasksInLevel - 1 ? (
+              <button 
+                type="button" 
+                className="btn btn-primary btn-proceed-next-task"
+                onClick={onProceedToNextTask}
+              >
+                <span>Proceed to Task {taskIndex + 2} of {totalTasksInLevel}</span>
+                <ArrowRight size={16} />
+              </button>
+            ) : (
+              /* If task 2 of 2: Check if minimum credit met for Next Level Promotion */
+              evalData.totalScore >= levelInfo.minCreditToPass && nextLevel ? (
+                <button 
+                  type="button" 
+                  className="btn btn-primary btn-advance-level"
+                  onClick={() => onAdvanceToNextLevel && onAdvanceToNextLevel(nextLevel.level)}
+                >
+                  <Award size={16} />
+                  <span>Advance to Level {nextLevel.level}: {nextLevel.name}</span>
+                  <ArrowRight size={16} />
+                </button>
+              ) : evalData.totalScore >= levelInfo.minCreditToPass && !nextLevel ? (
+                <button 
+                  type="button" 
+                  className="btn btn-primary btn-advance-level"
+                  onClick={onSelectNewRole}
+                >
+                  <Sparkles size={16} />
+                  <span>All 4 Levels Mastered! Explore Another Role</span>
+                  <ArrowRight size={16} />
+                </button>
+              ) : (
+                <button 
+                  type="button" 
+                  className="btn btn-secondary btn-retry-task"
+                  onClick={onRetakeSimulation}
+                >
+                  <RotateCcw size={16} />
+                  <span>Retry Task to Meet Minimum Credit ({levelInfo.minCreditToPass}%)</span>
+                </button>
+              )
+            )}
+
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={onRetakeSimulation}
+            >
               <RotateCcw size={16} />
-              <span>Retry this Simulation</span>
+              <span>Retry this Shift</span>
             </button>
 
-            <button className="btn btn-primary" onClick={onSelectNewRole}>
-              <span>Explore Next Role</span>
-              <ArrowRight size={16} />
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={onSelectNewRole}
+            >
+              <span>Change Role</span>
             </button>
           </div>
         </div>
       </div>
+
+      {/* STEP 14: MICRO-LEARNING SKILL SPRINT MODAL */}
+      {showSkillSprint && (
+        <MicroCourseSkillSprint 
+          gapSkill={evalData.edgeCaseDetails?.skill || 'API Error Handling'}
+          currentScore={evalData.edgeCaseDetails?.currentCapability || 54}
+          requiredScore={evalData.edgeCaseDetails?.requiredCapability || 72}
+          onClose={() => setShowSkillSprint(false)}
+          onCompleteSprint={(res) => {
+            setShowSkillSprint(false);
+            setSprintRemediated(true);
+          }}
+        />
+      )}
+
+      {/* STEP 17: VERIFY CREDENTIAL MODAL */}
+      {showVerifyModal && (
+        <div className="verify-cred-backdrop" onClick={() => setShowVerifyModal(false)}>
+          <div className="verify-cred-card animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="verify-modal-header">
+              <div className="verify-badge">
+                <ShieldCheck size={18} className="text-emerald" />
+                <span>OFFICIAL VERIFICATION REGISTRY</span>
+              </div>
+              <button 
+                type="button" 
+                className="btn-close-verify" 
+                onClick={() => setShowVerifyModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="verify-modal-body">
+              <h3 className="verify-title">Credential Verification Proof</h3>
+              <p className="verify-subtitle">
+                This micro-credential was awarded following live environment task simulation on DayOne.ai.
+              </p>
+
+              <div className="verify-info-table">
+                <div className="table-row">
+                  <span className="row-key">Recipient:</span>
+                  <span className="row-val font-bold text-white">{candidateDisplayName}</span>
+                </div>
+                <div className="table-row">
+                  <span className="row-key">Credential ID:</span>
+                  <span className="row-val font-mono text-cyan">{evalData.credentialId}</span>
+                </div>
+                <div className="table-row">
+                  <span className="row-key">Competency:</span>
+                  <span className="row-val font-semibold">{missionData.competency || 'Production Engineering'}</span>
+                </div>
+                <div className="table-row">
+                  <span className="row-key">Role & Level:</span>
+                  <span className="row-val">{role.name} — {levelInfo.name}</span>
+                </div>
+                <div className="table-row">
+                  <span className="row-key">Verified Readiness:</span>
+                  <span className="row-val font-mono text-emerald">{evalData.totalScore}%</span>
+                </div>
+                <div className="table-row">
+                  <span className="row-key">Status:</span>
+                  <span className="row-val badge-verified">✓ AUTHENTIC & VERIFIED</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="verify-modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  navigator.clipboard?.writeText?.(`https://dayone.ai/verify/${evalData.credentialId}`);
+                  alert('Verification URL copied to clipboard!');
+                }}
+              >
+                <Share2 size={14} />
+                <span>Copy Public Link</span>
+              </button>
+
+              <button 
+                type="button" 
+                className="btn btn-primary btn-sm"
+                onClick={() => setShowVerifyModal(false)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

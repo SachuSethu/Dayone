@@ -55,7 +55,7 @@ export const ALL_TASKS = [
 ].map(task => {
   const normRoleId = normalizeRoleId(task.roleId || task.role || task.applicableRoles?.[0]);
   const primaryCompetency = task.competency || (task.coreCompetencies && task.coreCompetencies[0]) || 'Software Engineering';
-  const diffLabel = task.difficulty || (task.level === 1 ? 'Foundation' : task.level === 2 ? 'Intermediate' : task.level === 3 ? 'Advanced' : 'Critical Incident');
+  const diffLabel = task.difficulty || (task.level === 1 ? 'Beginner' : task.level === 2 ? 'Intermediate' : task.level === 3 ? 'Professional' : 'Advanced');
   return {
     ...task,
     roleId: normRoleId,
@@ -63,6 +63,28 @@ export const ALL_TASKS = [
     levelLabel: task.levelLabel || `Level ${task.level}: ${diffLabel}`
   };
 });
+
+/**
+ * 4-Level Architecture Definitions
+ * Level 1: Beginner | Level 2: Intermediate | Level 3: Professional | Level 4: Advanced
+ * Each level carries 2 sequential tasks from the 8-task pool.
+ */
+export const LEVEL_DEFINITIONS = {
+  1: { key: 'beginner', name: 'Beginner', level: 1, minCreditToPass: 75, targetMinutes: 15 },
+  2: { key: 'intermediate', name: 'Intermediate', level: 2, minCreditToPass: 75, targetMinutes: 20 },
+  3: { key: 'professional', name: 'Professional', level: 3, minCreditToPass: 80, targetMinutes: 25 },
+  4: { key: 'advanced', name: 'Advanced', level: 4, minCreditToPass: 85, targetMinutes: 30 }
+};
+
+export function getLevelInfo(level) {
+  const num = Number(level) || 2;
+  return LEVEL_DEFINITIONS[num] || LEVEL_DEFINITIONS[2];
+}
+
+export function getNextLevel(currentLevel) {
+  const num = Number(currentLevel) || 1;
+  return num < 4 ? LEVEL_DEFINITIONS[num + 1] : null;
+}
 
 export const TASK_DATABASE_STATS = {
   totalTasks: ALL_TASKS.length, // 192
@@ -114,10 +136,10 @@ export function determineCandidateLevel({ candidateProfile, skillGaps = [], cand
                    candidateProfile?.experienceYears;
 
   if (typeof yearsExp === 'number') {
-    if (yearsExp <= 1.5) return 1; // Level 1: Foundation (Junior / 0-1 years)
-    if (yearsExp <= 4.0) return 2; // Level 2: Intermediate (Mid / 2-4 years)
-    if (yearsExp <= 7.5) return 3; // Level 3: Advanced (Senior / 5-7 years)
-    return 4;                      // Level 4: Critical Incident (Lead/Staff / 8+ years)
+    if (yearsExp <= 1.5) return 1; // Level 1: Beginner (0-1 years)
+    if (yearsExp <= 4.0) return 2; // Level 2: Intermediate (2-4 years)
+    if (yearsExp <= 7.5) return 3; // Level 3: Professional (5-7 years)
+    return 4;                      // Level 4: Advanced (8+ years)
   }
 
   // Check average evidence percentage from skill gaps
@@ -125,10 +147,10 @@ export function determineCandidateLevel({ candidateProfile, skillGaps = [], cand
     const totalEvidence = skillGaps.reduce((acc, curr) => acc + (curr.candidateEvidencePercent || curr.evidence || 0), 0);
     const avgEvidence = totalEvidence / skillGaps.length;
 
-    if (avgEvidence < 35) return 1; // Foundation
+    if (avgEvidence < 35) return 1; // Beginner
     if (avgEvidence < 65) return 2; // Intermediate
-    if (avgEvidence < 80) return 3; // Advanced
-    return 4;                       // Critical Incident
+    if (avgEvidence < 80) return 3; // Professional
+    return 4;                       // Advanced
   }
 
   // Default to Level 2 (Intermediate)

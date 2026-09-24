@@ -8,6 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell
 } from 'recharts';
 import SkillDetailModal from './SkillDetailModal';
+import SkillRemarkModal from './SkillRemarkModal';
 import { calculateEvidenceHistogram } from '../../lib/skills/gapEngine';
 import { 
   Sparkles, Target, Compass, Award, AlertTriangle, 
@@ -33,6 +34,10 @@ export default function CandidateProfileView({
   const [selectedSkillForModal, setSelectedSkillForModal] = useState(null);
   const [chartViewMode, setChartViewMode] = useState('radar'); // 'radar' | 'barchart' | 'histogram' | 'bars'
   const [activeAssignedIndex, setActiveAssignedIndex] = useState(0);
+
+  // Filter skills flagged with invalid or missing certifications
+  const remarkedSkills = skillGaps.filter(g => g.isRemarkedInvalid || g.remarkStatus === 'invalid_certification');
+  const [showSkillRemarkModal, setShowSkillRemarkModal] = useState(remarkedSkills.length > 0);
 
   // Compute Candidate Experience Level (1..4)
   const candidateLevel = determineCandidateLevel({
@@ -135,6 +140,26 @@ export default function CandidateProfileView({
             Actual workplace proficiency is validated during DayOne’s live First-Day Simulation.
           </div>
         </div>
+
+        {/* Remarked Skills Notice Banner */}
+        {remarkedSkills.length > 0 && (
+          <div className="remark-alert-banner">
+            <div className="remark-alert-left">
+              <AlertTriangle size={18} className="text-amber flex-shrink-0" />
+              <div>
+                <strong>Strict AI Evaluation Audit:</strong> {remarkedSkills.length} skill(s) carrying official evaluation remarks: <em>"This skill is not valid until you submit a valid certification."</em>
+              </div>
+            </div>
+            <button 
+              type="button" 
+              className="btn-view-remarks" 
+              onClick={() => setShowSkillRemarkModal(true)}
+            >
+              <span>Inspect {remarkedSkills.length} Remarked Skill{remarkedSkills.length > 1 ? 's' : ''}</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Profile Header Card */}
         <div className="profile-hero-card">
@@ -445,6 +470,27 @@ export default function CandidateProfileView({
                 </div>
               )}
 
+              {remarkedSkills.length > 0 && (
+                <div 
+                  className="insight-card highlight-amber clickable-card"
+                  onClick={() => setShowSkillRemarkModal(true)}
+                  title="Click to view full unverified skill audit"
+                >
+                  <div className="insight-top">
+                    <AlertTriangle size={16} className="text-amber" />
+                    <strong>Certification Remarks ({remarkedSkills.length})</strong>
+                  </div>
+                  <p>
+                    Skills flagged: <em>"This skill is not valid until you submit a valid certification."</em>
+                  </p>
+                  <div className="insight-tags">
+                    {remarkedSkills.map(g => (
+                      <span key={g.skill} className="mini-tag tag-zero">⚠️ {g.skill}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="insight-card highlight-amber">
                 <div className="insight-top">
                   <AlertTriangle size={16} className="text-amber" />
@@ -607,7 +653,14 @@ export default function CandidateProfileView({
                       onClick={() => setSelectedSkillForModal(g)}
                     >
                       <td className="cell-skill-name">
-                        <strong>{g.skill}</strong>
+                        <div className="skill-name-col">
+                          <strong>{g.skill}</strong>
+                          {g.isRemarkedInvalid && (
+                            <span className="skill-remark-tag" title={g.validationRemark || "This skill is not valid until you submit a valid certification."}>
+                              ⚠️ Not Valid Until Certified
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="cell-category">
                         <span className="category-pill">{g.category || 'Engineering'}</span>
@@ -624,9 +677,13 @@ export default function CandidateProfileView({
                       </td>
                       <td className="cell-provenance">
                         {g.hasCertification ? (
-                          <span className="prov-basis-badge cert">🎓 Certified</span>
+                          <span className="prov-basis-badge cert">🎓 Accredited Cert</span>
                         ) : g.hasProjectInfo ? (
-                          <span className="prov-basis-badge proj">🛠️ Project Info</span>
+                          <span className="prov-basis-badge proj">🛠️ Project Evaluated</span>
+                        ) : g.isRemarkedInvalid ? (
+                          <span className="prov-basis-badge invalid" title={g.validationRemark}>
+                            ⚠️ Needs Valid Cert
+                          </span>
                         ) : (
                           <span className="prov-basis-badge none">⚠️ No Project/Cert</span>
                         )}
@@ -640,9 +697,15 @@ export default function CandidateProfileView({
                         </span>
                       </td>
                       <td className="cell-status">
-                        <span className={`status-pill ${g.alignmentStatus}`}>
-                          {isAligned ? 'Strong Alignment' : isDevOpp ? 'Development Area' : (isZero ? 'Zero Evidence' : 'Priority Gap')}
-                        </span>
+                        {g.isRemarkedInvalid ? (
+                          <span className="status-pill status-invalid-cert" title={g.validationRemark}>
+                            ⚠️ Invalid Until Certified
+                          </span>
+                        ) : (
+                          <span className={`status-pill ${g.alignmentStatus}`}>
+                            {isAligned ? 'Strong Alignment' : isDevOpp ? 'Development Area' : (isZero ? 'Zero Evidence' : 'Priority Gap')}
+                          </span>
+                        )}
                       </td>
                       <td className="cell-actions">
                         <button 
@@ -854,7 +917,7 @@ export default function CandidateProfileView({
                 <button 
                   type="button" 
                   className="btn-start-first-day"
-                  onClick={() => onStartSimulation && onStartSimulation(activeTask)}
+                  onClick={() => onStartSimulation && onStartSimulation(activeTask, assignedTasks, activeAssignedIndex, candidateLevel)}
                 >
                   <Play size={18} className="play-icon" />
                   <span>START TASK {activeAssignedIndex + 1} SIMULATION</span>
@@ -873,8 +936,17 @@ export default function CandidateProfileView({
           onClose={() => setSelectedSkillForModal(null)}
           onTestSkill={() => {
             setSelectedSkillForModal(null);
-            onStartSimulation && onStartSimulation(activeTask);
+            onStartSimulation && onStartSimulation(activeTask, assignedTasks, activeAssignedIndex, candidateLevel);
           }}
+        />
+      )}
+
+      {/* Skill Remark Pop-up Modal */}
+      {showSkillRemarkModal && remarkedSkills.length > 0 && (
+        <SkillRemarkModal 
+          remarkedSkills={remarkedSkills}
+          onClose={() => setShowSkillRemarkModal(false)}
+          onUpdateResume={onReset}
         />
       )}
     </div>

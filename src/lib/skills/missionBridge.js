@@ -10,7 +10,10 @@ export function buildSimulationMissionData({
   skillGaps = [],
   priorityGaps = [],
   aiMission = {},
-  assignedTask = null
+  assignedTask = null,
+  allAssignedTasks = [],
+  taskIndex = 0,
+  candidateLevel = 2
 }) {
   const roleMapping = {
     'frontend-developer': 'frontend',
@@ -100,6 +103,11 @@ export function buildSimulationMissionData({
     ],
     simulatedThreatData: template.simulatedThreatData || baseTemplate.simulatedThreatData || null,
     currentLayoutState: template.currentLayoutState || baseTemplate.currentLayoutState || null,
+    assignedTask: matchedTask,
+    allAssignedTasks: (allAssignedTasks && allAssignedTasks.length > 0) ? allAssignedTasks : [matchedTask],
+    taskIndex: Number(taskIndex) || 0,
+    candidateLevel: Number(candidateLevel) || 2,
+    targetRole,
     createdAt: new Date().toISOString()
   };
 }

@@ -55,19 +55,23 @@ export async function analyzeResume(resumeText, targetRole, roleRequirements = [
 
   const prompt = `You are DayOne's Rigorous AI Evaluation Engine for Resume Understanding.
 
-STRICT EVALUATION POLICY:
-1. COURSES WITHOUT CERTIFICATION DO NOT COUNT:
-   - If a candidate only lists course names, bootcamps, or tutorials (e.g. "Completed React Course", "Udemy Python", "Coursera Web Dev") WITHOUT an accredited certification credential or license, DO NOT consider it as a verified skill. Set certification value to 0.0 and flag it under unverifiedCourseClaims.
-   - Only recognized certifications (e.g. CompTIA, AWS Certified, Meta Certified, Cisco, Oracle, Kubernetes CKA, verified university diploma) provide certification evidence.
-2. PROJECT INFO IS MANDATORY:
-   - To receive project evidence, a project MUST provide concrete project info (technologies used, architectural responsibilities, deliverables).
-   - If a candidate lists a skill only as a keyword without project info, or if no projects are entered for it, consider its project value as strictly 0.0.
-   - If a skill has NO project info AND NO accredited certification, its resumeEvidence MUST be 0.0 (0%).
-3. Distinguish between:
-   - strong evidence (>= 0.70): clear project implementation with technical details and/or verified certification
-   - moderate evidence (0.36 - 0.69): project mention with basic context
-   - limited evidence (0.01 - 0.35): brief mention in work experience
-   - zero evidence (0.00): unverified course claims, standalone keywords without project info, or omitted skills.
+CRITICAL EVALUATION POLICIES:
+1. RESUME REJECTION POLICY:
+   - If the candidate's resume has NO accredited certifications AND NO documented projects with project info (e.g. they only listed course titles, tutorials, bootcamps, or keyword lists without evidence), set "isRejected": true with "rejectionReason": "No accredited certifications or documented project deliverables found in uploaded resume. DayOne strictly requires accredited industry certification credentials or concrete project documentation with technologies and deliverables."
+   - If the resume contains at least one verified accredited certification OR documented project deliverables, set "isRejected": false.
+
+2. PROJECT KNOWLEDGE EVALUATION WITHOUT CERTIFICATION:
+   - If a candidate has done a project with a skill (even without any certification), EVALUATE THE PROJECT info (technologies used, architectural responsibilities, context, deliverables) and assign their knowledge score based on that project (0.65 - 0.90).
+   - Set "hasProjectInfo": true, "hasCertification": false, "validationMethod": "Project Experience Evaluated", "isRemarkedInvalid": false, "validationRemark": null.
+
+3. SPECIFIC SKILL INVALID CERTIFICATION REMARK:
+   - If a skill has NO project info, and its certification is missing, unaccredited, or invalid for that specific skill (e.g. course claims without official certificates):
+     - DO NOT assign silent zero without remarking!
+     - Set "resumeEvidence": 0.0, "isRemarkedInvalid": true, "remarkStatus": "invalid_certification", "validationRemark": "This skill is not valid until you submit a valid certification.", "validationMethod": "Invalid / Unverified Certification".
+     - In evidence array, note: "This skill is not valid until you submit a valid certification."
+
+4. ACCREDITED CERTIFICATIONS:
+   - Only recognized official credentials (e.g. AWS Certified, CompTIA, Cisco, Meta, Oracle, Kubernetes CKA, Google Cloud, accredited university degree) provide certification evidence (0.85 - 0.95).
 
 TARGET ROLE: ${targetRole}
 ROLE CORE SKILLS:
@@ -78,6 +82,8 @@ ${resumeText.slice(0, 12000)}
 
 Return ONLY a single valid JSON object strictly matching this schema:
 {
+  "isRejected": false,
+  "rejectionReason": null,
   "candidate": {
     "targetRole": "${targetRole}",
     "detectedName": "Candidate Name if found",
@@ -101,7 +107,10 @@ Return ONLY a single valid JSON object strictly matching this schema:
       "evidenceLevel": "strong",
       "hasProjectInfo": true,
       "hasCertification": false,
-      "validationStatus": "not_validated",
+      "isRemarkedInvalid": false,
+      "remarkStatus": null,
+      "validationRemark": null,
+      "validationMethod": "Project Experience Evaluated",
       "evidence": [
         "Concrete project evidence quote or reason why scored 0"
       ]
@@ -125,6 +134,8 @@ Return ONLY a single valid JSON object strictly matching this schema:
 
     return {
       ...parsed,
+      isRejected: Boolean(parsed.isRejected),
+      rejectionReason: parsed.rejectionReason || null,
       isDemoFallback: false
     };
   } catch (err) {
@@ -234,30 +245,51 @@ Return ONLY valid JSON:
 function generateFallbackResumeAnalysis(resumeText, targetRole, roleRequirements = []) {
   const textLower = (resumeText || '').toLowerCase();
   
-  // 1. Detect Certifications (e.g. "certified", "comptia", "aws", "meta", "license", "credential")
+  // 1. Detect Accredited Industry Certifications
   const verifiedCertifications = [];
-  const certKeywords = ['certified', 'certification', 'license', 'credential', 'comptia', 'aws certified', 'cisco', 'security+'];
-  certKeywords.forEach(kw => {
-    if (textLower.includes(kw)) {
-      const matchIndex = textLower.indexOf(kw);
-      const snippet = resumeText.slice(Math.max(0, matchIndex - 10), Math.min(resumeText.length, matchIndex + 50)).trim();
-      if (!verifiedCertifications.some(c => c.name.toLowerCase().includes(kw))) {
-        verifiedCertifications.push({
-          name: snippet.replace(/[\r\n]+/g, ' ').slice(0, 40),
-          issuer: 'Accredited Credential Issuer',
-          verified: true
-        });
+  const recognizedCertPatterns = [
+    /\b(aws\s+certified\s+[a-z0-9\s-]+)\b/i,
+    /\b(comptia\s+(?:security\+|network\+|a\+|cyso\+|casp\+|linux\+))\b/i,
+    /\b(cisco\s+certified\s+[a-z0-9\s-]+|ccna|ccnp|ccie)\b/i,
+    /\b(google\s+cloud\s+certified\s+[a-z0-9\s-]+)\b/i,
+    /\b(microsoft\s+certified\s+[a-z0-9\s-]+|azure\s+certified\s+[a-z0-9\s-]+)\b/i,
+    /\b(meta\s+certified\s+[a-z0-9\s-]+)\b/i,
+    /\b(certified\s+kubernetes\s+(?:administrator|application\s+developer)|cka|ckad)\b/i,
+    /\b(cissp|ceh|certified\s+information\s+systems\s+security\s+professional)\b/i,
+    /\b(certified\s+soc\s+analyst|csa)\b/i,
+    /\b(certified\s+scrum\s+master|csm)\b/i
+  ];
+
+  recognizedCertPatterns.forEach(pattern => {
+    const match = resumeText.match(pattern);
+    if (match) {
+      const matchText = match[0].trim();
+      const matchLower = matchText.toLowerCase();
+      const negRegex = new RegExp(`(?:no|without|not|lacks?|zero)\\s+[^.\\n]*?${matchLower.slice(0, 10)}`, 'i');
+      if (!negRegex.test(textLower)) {
+        if (!verifiedCertifications.some(c => c.name.toLowerCase() === matchLower)) {
+          verifiedCertifications.push({
+            name: matchText,
+            issuer: 'Accredited Credential Authority',
+            verified: true
+          });
+        }
       }
     }
   });
 
-  // 2. Detect Unverified Course Claims (e.g. "course", "udemy", "coursera", "bootcamp", "tutorial" WITHOUT credential)
+  // Explicit check: If text says "no certs", "no certifications", "no accredited certifications", empty the array
+  if (/(?:no|without|zero|lacks?)\s+(?:accredited\s+)?(?:certifications?|certs?|credentials?|licenses?)\b/i.test(textLower)) {
+    verifiedCertifications.length = 0;
+  }
+
+  // 2. Detect Unverified Course Claims (e.g. "udemy", "coursera", "bootcamp", "tutorial" WITHOUT credential)
   const unverifiedCourseClaims = [];
-  const courseKeywords = ['udemy', 'coursera', 'bootcamp', 'codecademy', 'completed course', 'tutorial'];
+  const courseKeywords = ['udemy', 'coursera', 'bootcamp', 'codecademy', 'completed course', 'tutorial', 'youtube'];
   courseKeywords.forEach(kw => {
-    if (textLower.includes(kw) && verifiedCertifications.length === 0) {
+    if (textLower.includes(kw)) {
       unverifiedCourseClaims.push({
-        courseName: `${kw.toUpperCase()} Coursework`,
+        courseName: `${kw.toUpperCase()} Coursework / Tutorial`,
         reason: 'Course listed without official accredited certification credential (scored 0% per strict evaluation rules)'
       });
     }
@@ -265,31 +297,48 @@ function generateFallbackResumeAnalysis(resumeText, targetRole, roleRequirements
 
   // 3. Extract Section-Specific Content
   let projectText = '';
-  const projectHeaderMatch = resumeText.match(/(?:projects?|work experience|experience|deliverables|employment)[\s\S]*?(?=(?:education|certifications?|courses?|skills?|$))/i);
+  const projectHeaderMatch = resumeText.match(/(?:^|\r?\n)\s*(?:featured\s+)?(?:technical\s+)?(?:projects?|work\s+experience|professional\s+experience|experience|deliverables|employment)(?:[^\r\n]*?)[:\r\n][\s\S]*?(?=(?:(?:^|\r?\n)\s*(?:education|certifications?|courses?|online\s+courses?|bootcamps?|skills?)(?:[^\r\n]*?)[:\r\n]|$))/i);
   if (projectHeaderMatch) {
     projectText = projectHeaderMatch[0].toLowerCase();
   } else {
     const lines = resumeText.split(/\r?\n/);
     const projectLines = lines.filter(l => 
-      /(?:built|developed|engineered|implemented|designed|architected|deployed|created|fixed|migrated|refactored)\b/i.test(l)
+      /(?:built|developed|engineered|implemented|designed|architected|deployed|created|fixed|migrated|refactored)\b/i.test(l) &&
+      !/(?:course|video|tutorial|bootcamp|lecture|watched|completed course)\b/i.test(l)
     );
-    projectText = projectLines.join(' ').toLowerCase();
+    if (projectLines.length > 0) {
+      projectText = projectLines.join(' ').toLowerCase();
+    }
   }
 
   let courseText = '';
-  const courseHeaderMatch = resumeText.match(/(?:education|courses?|bootcamps?|certifications?)[\s\S]*?(?=(?:projects?|experience|deliverables|employment|skills?|$))/i);
+  const courseHeaderMatch = resumeText.match(/(?:^|\r?\n)\s*(?:education|courses?|online\s+courses?|bootcamps?|certifications?)(?:[^\r\n]*?)[:\r\n][\s\S]*?(?=(?:(?:^|\r?\n)\s*(?:projects?|work\s+experience|experience|deliverables|skills?)(?:[^\r\n]*?)[:\r\n]|$))/i);
   if (courseHeaderMatch) {
     courseText = courseHeaderMatch[0].toLowerCase();
+  } else {
+    courseText = textLower;
   }
 
   const documentedProjects = [];
-  if (projectText.length > 20) {
+  const projectTechs = roleRequirements.filter(r => projectText.includes(r.name.toLowerCase())).map(r => r.name);
+  const hasProjectVerbs = /(?:built|developed|engineered|implemented|designed|architected|deployed|created|fixed|migrated|refactored)\b/i.test(projectText);
+  const isNegativeProjectClaim = /(?:no\s+projects?|without\s+projects?|no\s+production\s+experience)\b/i.test(textLower);
+
+  if (projectText.length > 25 && (projectTechs.length > 0 || hasProjectVerbs) && !isNegativeProjectClaim) {
     documentedProjects.push({
       name: 'Documented Project Deliverables',
       hasProjectInfo: true,
-      technologies: roleRequirements.filter(r => projectText.includes(r.name.toLowerCase())).map(r => r.name)
+      technologies: projectTechs
     });
   }
+
+  // Strict Policy 1: If resume contains NO certifications AND NO documented projects, REJECT IT
+  const hasAnyCert = verifiedCertifications.length > 0;
+  const hasAnyProject = documentedProjects.length > 0;
+  const isRejected = !hasAnyCert && !hasAnyProject;
+  const rejectionReason = isRejected
+    ? "No accredited certifications or documented project deliverables were detected in the uploaded resume. Per DayOne's Strict AI Evaluation Standards, resumes without official credentials or documented projects cannot be evaluated."
+    : null;
 
   // 4. Score Each Skill Strictly Under AI Evaluation Rules
   const skills = roleRequirements.map(req => {
@@ -303,39 +352,52 @@ function generateFallbackResumeAnalysis(resumeText, targetRole, roleRequirements
     let evidenceLevel = 'zero';
     let hasProjectInfo = false;
     let hasCertification = false;
+    let isRemarkedInvalid = false;
+    let remarkStatus = null;
+    let validationRemark = null;
+    let validationMethod = 'Unverified';
     const evidence = [];
 
+    // Branch A: Verified accredited certification
     if (isInsideCert) {
       hasCertification = true;
       resumeEvidence = 0.90;
       evidenceLevel = 'strong';
+      validationMethod = 'Accredited Certification Credential';
       evidence.push(`Verified through accredited industry certification credential in resume.`);
     }
 
+    // Branch B: Completed a project with the skill without certification -> evaluate project and assign knowledge
     if (isInsideProject) {
       hasProjectInfo = true;
       const matches = (projectText.match(new RegExp(skillNameLower, 'g')) || []).length;
       if (matches >= 3) {
         resumeEvidence = Math.max(resumeEvidence, 0.85);
         evidenceLevel = 'strong';
-        evidence.push(`Supported by ${matches} active project references with documented architectural details.`);
+        evidence.push(`Evaluated from documented project: Supported by ${matches} active project implementations with architecture & code deliverables.`);
       } else {
         resumeEvidence = Math.max(resumeEvidence, 0.65);
         evidenceLevel = 'moderate';
-        evidence.push(`Documented with active project implementation context.`);
+        evidence.push(`Evaluated from documented project: Active implementation and technical deliverables.`);
       }
+      validationMethod = hasCertification ? 'Certification + Project Evidence' : 'Project Experience Evaluated (No Cert Needed)';
     }
 
-    // STRICT RULE: If mentioned only as a keyword, or in a course without cert, or without project info:
+    // Branch C: Missing/invalid certification AND no project info -> Remark the skill!
     if (!hasProjectInfo && !hasCertification) {
       resumeEvidence = 0.0;
       evidenceLevel = 'zero';
+      isRemarkedInvalid = true;
+      remarkStatus = 'invalid_certification';
+      validationRemark = 'This skill is not valid until you submit a valid certification.';
+      validationMethod = 'Invalid / Unverified Certification';
+
       if (isInsideCourseOnly) {
-        evidence.push(`Found only in course title/tutorial without official accredited certification credential. Scored 0% per strict evaluation rules.`);
+        evidence.push(`Found only in course title or unaccredited tutorial. This skill is not valid until you submit a valid certification.`);
       } else if (isMentioned) {
-        evidence.push(`Listed as standalone keyword without project information or deliverables. Scored 0% value.`);
+        evidence.push(`Listed as standalone keyword without project information or deliverables. This skill is not valid until you submit a valid certification.`);
       } else {
-        evidence.push(`No project info or certification credentials found in uploaded resume (0% value).`);
+        evidence.push(`No valid accredited certification or project info found. This skill is not valid until you submit a valid certification.`);
       }
     }
 
@@ -345,16 +407,24 @@ function generateFallbackResumeAnalysis(resumeText, targetRole, roleRequirements
       evidenceLevel,
       hasProjectInfo,
       hasCertification,
-      validationStatus: 'not_validated',
+      isRemarkedInvalid,
+      remarkStatus,
+      validationRemark,
+      validationMethod,
+      validationStatus: isRemarkedInvalid ? 'invalid_until_certified' : 'validated',
       evidence
     };
   });
 
   return {
+    isRejected,
+    rejectionReason,
     candidate: {
       targetRole,
       detectedName: 'Candidate Profile',
-      summary: `AI Evaluation conducted against ${targetRole} production criteria. Skills strictly audited against documented project info and accredited certifications.`
+      summary: isRejected 
+        ? 'Resume rejected: Missing required accredited certifications and project documentation.' 
+        : `AI Evaluation conducted against ${targetRole} production criteria. Skills strictly audited against documented project info and accredited certifications.`
     },
     provenance: {
       verifiedCertifications,

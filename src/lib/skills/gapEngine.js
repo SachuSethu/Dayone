@@ -71,9 +71,13 @@ export function calculateSkillGaps(candidateSkills = [], roleRequirements = []) 
       isZeroValue: isZero,
       hasProjectInfo: candidateMatch?.hasProjectInfo || false,
       hasCertification: candidateMatch?.hasCertification || false,
+      isRemarkedInvalid: candidateMatch?.isRemarkedInvalid || false,
+      remarkStatus: candidateMatch?.remarkStatus || null,
+      validationRemark: candidateMatch?.validationRemark || null,
+      validationMethod: candidateMatch?.validationMethod || (candidateMatch?.hasCertification ? 'Accredited Certification' : candidateMatch?.hasProjectInfo ? 'Project Evidence Evaluated' : 'Invalid / Unverified Certification'),
       evidenceLevel: isZero ? 'zero' : evidenceLevel,
-      evidence: candidateMatch?.evidence || ['No verified project info or accredited certification found in resume (0% value).'],
-      validationStatus: candidateMatch?.validationStatus || 'not_validated'
+      evidence: candidateMatch?.evidence || (candidateMatch?.validationRemark ? [candidateMatch.validationRemark] : ['No verified project info or accredited certification found in resume (0% value).']),
+      validationStatus: candidateMatch?.validationStatus || (candidateMatch?.isRemarkedInvalid ? 'invalid_until_certified' : 'validated')
     };
   });
 

@@ -1,15 +1,15 @@
-// src/components/SimulationEngine.jsx
-// Main generic simulation engine orchestrator coordinating the entire DayOne.ai role-based simulation lifecycle.
-
 import React, { useState } from 'react';
 import RoleSelector from './RoleSelector';
 import MissionGenerator from './MissionGenerator';
 import WorkspaceRenderer from './WorkspaceRenderer';
 import EvaluationEngine from './EvaluationEngine';
 import { SIMULATION_EVENTS } from '../data/events';
+import { buildSimulationMissionData } from '../lib/skills/missionBridge';
+import { selectAssignedTasksForCandidate } from '../data/taskDatabase';
+import { getLevelInfo, getNextLevel } from '../lib/skills/statsEngine';
 import { 
   Sparkles, Layers, Shield, Award, Terminal, 
-  ChevronRight, RefreshCw, Cpu, LogOut
+  ChevronRight, RefreshCw, Cpu, LogOut, CheckCircle2
 } from 'lucide-react';
 
 const STAGES = {
@@ -33,6 +33,24 @@ export default function SimulationEngine({
   const [simulationConfig, setSimulationConfig] = useState(null);
   const [missionData, setMissionData] = useState(initialMissionData || null);
   const [workspaceState, setWorkspaceState] = useState(null);
+
+  // Multi-Task & 4-Level progression state
+  const [currentLevel, setCurrentLevel] = useState(
+    initialMissionData?.candidateLevel || 2
+  );
+  const [taskIndex, setTaskIndex] = useState(
+    initialMissionData?.taskIndex || 0
+  );
+  const [assignedTasks, setAssignedTasks] = useState(() => {
+    if (initialMissionData?.allAssignedTasks && initialMissionData.allAssignedTasks.length > 0) {
+      return initialMissionData.allAssignedTasks;
+    }
+    if (initialMissionData?.assignedTask) {
+      return [initialMissionData.assignedTask];
+    }
+    return [];
+  });
+
   const [simulationEvents, setSimulationEvents] = useState(() => {
     if (initialMissionData) {
       const initialRoleEvents = SIMULATION_EVENTS[initialMissionData.role?.id] || [];
@@ -89,6 +107,75 @@ export default function SimulationEngine({
     setCurrentStage(STAGES.WORKSPACE);
   };
 
+  // Step 5: Sequential Multi-Task Progression (Task 1 -> Task 2)
+  const handleProceedToNextTask = () => {
+    const nextIdx = taskIndex + 1;
+    let nextTask = assignedTasks[nextIdx];
+
+    // Fallback if not preloaded
+    if (!nextTask) {
+      const poolTasks = selectAssignedTasksForCandidate({
+        roleId: missionData?.role?.id || 'frontend',
+        candidateLevel: currentLevel,
+        skillGaps: missionData?.skillGaps || [],
+        candidateProfile: missionData?.candidateProfile,
+        maxTasks: 2
+      });
+      nextTask = poolTasks[nextIdx] || poolTasks[0];
+    }
+
+    const nextSimData = buildSimulationMissionData({
+      targetRole: missionData?.targetRole || missionData?.role,
+      candidateProfile: missionData?.candidateProfile,
+      skillGaps: missionData?.skillGaps,
+      priorityGaps: missionData?.priorityGaps,
+      aiMission: missionData?.aiMission,
+      assignedTask: nextTask,
+      allAssignedTasks: assignedTasks,
+      taskIndex: nextIdx,
+      candidateLevel: currentLevel
+    });
+
+    setTaskIndex(nextIdx);
+    setMissionData(nextSimData);
+    setWorkspaceState(null);
+    setCurrentStage(STAGES.WORKSPACE);
+  };
+
+  // Step 6: 4-Level Progression Promotion (Level N -> Level N+1)
+  const handleAdvanceToNextLevel = (nextLevelNum) => {
+    const targetLevel = nextLevelNum || (currentLevel + 1);
+
+    // Dynamically pick 2 new tasks targeting weaknesses at the next level from the 8-task pool
+    const newTasks = selectAssignedTasksForCandidate({
+      roleId: missionData?.role?.id || 'frontend',
+      candidateLevel: targetLevel,
+      skillGaps: missionData?.skillGaps || [],
+      candidateProfile: missionData?.candidateProfile,
+      maxTasks: 2
+    });
+
+    const firstTask = newTasks[0];
+    const newSimData = buildSimulationMissionData({
+      targetRole: missionData?.targetRole || missionData?.role,
+      candidateProfile: missionData?.candidateProfile,
+      skillGaps: missionData?.skillGaps,
+      priorityGaps: missionData?.priorityGaps,
+      aiMission: missionData?.aiMission,
+      assignedTask: firstTask,
+      allAssignedTasks: newTasks,
+      taskIndex: 0,
+      candidateLevel: targetLevel
+    });
+
+    setCurrentLevel(targetLevel);
+    setAssignedTasks(newTasks);
+    setTaskIndex(0);
+    setMissionData(newSimData);
+    setWorkspaceState(null);
+    setCurrentStage(STAGES.WORKSPACE);
+  };
+
   const handleSelectNewRole = () => {
     if (propOnSelectNewRole) {
       propOnSelectNewRole();
@@ -96,6 +183,8 @@ export default function SimulationEngine({
       setCurrentStage(STAGES.ROLE_SELECT);
     }
   };
+
+  const currentLevelInfo = getLevelInfo(currentLevel);
 
   return (
     <div className="simulation-engine-app">
@@ -132,9 +221,15 @@ export default function SimulationEngine({
           </div>
         </div>
 
-        {/* Global Action Status */}
+        {/* Global Action Status & Level/Task Indicator */}
         <div className="engine-global-status">
-          {simulationConfig && (
+          {missionData && (
+            <div className="engine-level-badge">
+              <span className="badge-level-name">Level {currentLevel}: {currentLevelInfo.name}</span>
+              <span className="badge-task-counter">Task {taskIndex + 1} of {assignedTasks.length > 0 ? assignedTasks.length : 2}</span>
+            </div>
+          )}
+          {simulationConfig && !missionData && (
             <span className="active-role-pill">
               {simulationConfig.role.name}
             </span>
@@ -193,6 +288,11 @@ export default function SimulationEngine({
             workspaceState={workspaceState}
             onRetakeSimulation={handleRetakeSimulation}
             onSelectNewRole={handleSelectNewRole}
+            onProceedToNextTask={handleProceedToNextTask}
+            onAdvanceToNextLevel={handleAdvanceToNextLevel}
+            taskIndex={taskIndex}
+            totalTasksInLevel={assignedTasks.length > 0 ? assignedTasks.length : 2}
+            currentLevel={currentLevel}
           />
         )}
       </main>

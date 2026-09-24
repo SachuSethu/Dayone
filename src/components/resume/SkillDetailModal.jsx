@@ -77,13 +77,31 @@ export default function SkillDetailModal({ skill, onClose, onTestSkill }) {
           </div>
         </div>
 
+        {/* Official AI Evaluation Remark Callout */}
+        {(skill.isRemarkedInvalid || skill.validationRemark) && (
+          <div className="skill-modal-remark-banner">
+            <AlertTriangle size={20} className="text-amber flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="remark-banner-title">OFFICIAL AI EVALUATION AUDIT REMARK</div>
+              <p className="remark-banner-text">
+                {skill.validationRemark || "This skill is not valid until you submit a valid certification."}
+              </p>
+              <span className="remark-banner-sub">
+                Official Standard: Course claims or standalone keyword mentions without accredited certificates or documented project deliverables are not valid.
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Evidence Provenance Badge Strip */}
         <div className="modal-provenance-strip">
           <span className="prov-strip-label">Evidence Verification Basis:</span>
           {skill.hasCertification ? (
             <span className="prov-chip cert"><GraduationCap size={13} /> Accredited Industry Certification</span>
           ) : skill.hasProjectInfo ? (
-            <span className="prov-chip proj"><Briefcase size={13} /> Documented Project Implementation</span>
+            <span className="prov-chip proj"><Briefcase size={13} /> Documented Project Implementation (No Cert Needed)</span>
+          ) : skill.isRemarkedInvalid ? (
+            <span className="prov-chip invalid"><AlertTriangle size={13} /> Unverified: Needs Valid Certification</span>
           ) : (
             <span className="prov-chip zero"><AlertOctagon size={13} /> Missing Project Info / Uncertified (Scored 0%)</span>
           )}
@@ -131,7 +149,9 @@ export default function SkillDetailModal({ skill, onClose, onTestSkill }) {
             <h4 className="section-title">DayOne AI Diagnostic Recommendation</h4>
           </div>
           <p className="recommendation-text">
-            {isZero ? (
+            {skill.isRemarkedInvalid ? (
+              `${skill.skill} carries an official AI remark: "${skill.validationRemark || 'This skill is not valid until you submit a valid certification.'}" Under DayOne's strict evaluation policy, course claims without accredited certificates are given zero value. You can validate this skill directly in today's interactive First-Day Mission.`
+            ) : isZero ? (
               `${skill.skill} received a 0% evidence rating because your resume lacked documented project implementation details or an accredited certification credential. Passive course mentions without certificates are discarded. We recommend proving this skill directly in today's interactive First-Day Mission.`
             ) : isAligned ? (
               `Your resume provides solid project-backed evidence for ${skill.skill}. The upcoming simulation will test how you apply this in edge-case production scenarios.`

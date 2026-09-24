@@ -68,7 +68,7 @@ export default function JiraTool({ missionData, workspaceState, onUpdateJiraStat
               <span>Bug</span>
             </span>
             <h2 className="jira-summary">
-              [P1 CRITICAL] Checkout API times out on 3G/4G connections with unhandled promise rejection
+              BUG-284: Checkout button becomes unresponsive
             </h2>
           </div>
 
@@ -76,10 +76,18 @@ export default function JiraTool({ missionData, workspaceState, onUpdateJiraStat
             <h4 className="jira-section-title">Issue Description</h4>
             <div className="jira-description-box">
               <p>
-                Mobile shoppers in APAC and EU experiencing high latency report the payment button hangs in 
-                "Processing Payment..." indefinitely. Sentry alerts confirm recurring <code>504 Gateway Timeout</code> 
+                <strong>Several users reported that the checkout button stops responding after changing their payment method.</strong>
+              </p>
+              <p>
+                Mobile shoppers in APAC and EU experiencing network latency report that the payment button hangs in 
+                "Processing Payment..." indefinitely after switching payment methods. Sentry alerts confirm recurring <code>504 Gateway Timeout</code> 
                 and uncaught exceptions when <code>fetch</code> resolves with non-200 status codes.
               </p>
+              <div className="jira-meta-strip">
+                <span className="jira-meta-tag"><AlertCircle size={12} className="text-rose" /> Priority: <strong>High</strong></span>
+                <span className="jira-meta-tag"><User size={12} className="text-cyan" /> Reported by: <strong>QA (Maya)</strong></span>
+                <span className="jira-meta-tag"><Tag size={12} className="text-amber" /> Environment: <strong>Production</strong></span>
+              </div>
               <div className="jira-code-snippet">
                 <span className="snippet-title">Sentry Exception Trace:</span>
                 <code>

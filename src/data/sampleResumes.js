@@ -165,5 +165,28 @@ Data Analyst | MetricPulse Analytics (2022 - Present)
 Junior Analyst | City Logistics (2021 - 2022)
 - Cleaned and prepared shipping logistics data with Pandas and SQL.
 - Created weekly operational reports for regional supply chain directors.`
+  },
+
+  'unverified-courses-test': {
+    name: 'Unaccredited Coursework Only (Triggers Strict Rejection Pop-up)',
+    fileName: 'Unaccredited_Coursework_Resume.pdf',
+    roleId: 'frontend-developer',
+    text: `DEVIN REED
+Aspiring Web Developer
+devin.reed@example.com • San Jose, CA
+
+CAREER OBJECTIVE
+Passionate web learner seeking entry-level software position after completing online video lectures.
+
+ONLINE VIDEO COURSES & TUTORIALS
+- Udemy: The Complete 2024 Web Development Bootcamp (Watched video modules)
+- Coursera: Introduction to Frontend Technologies (Non-accredited course audit)
+- Codecademy: Learn Modern JavaScript & React (Completion badge)
+- YouTube: 12-Hour Full Stack Tutorial by Traversy Media
+
+SKILLS
+React, JavaScript, TypeScript, REST APIs, Git, Testing
+
+NOTE: Candidate has no accredited industry credentials (e.g. AWS, Meta, Cisco, CompTIA) and no documented technical project deliverables or architecture.`
   }
 };

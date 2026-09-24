@@ -6,7 +6,8 @@ export default function AIAssistantTool({
   role, 
   missionData, 
   workspaceState,
-  onApplyHint 
+  onApplyHint,
+  onAskQuestion
 }) {
   const aiLead = role.aiLead;
 
@@ -32,6 +33,9 @@ export default function AIAssistantTool({
     const q = query.toLowerCase();
 
     if (role.id === 'frontend') {
+      if (q.includes('payment method') || q.includes('same response') || q.includes('return the same')) {
+        return "Good question. What would you check to verify that? Inspect the network payload or examine how state updates in `checkoutApi.js`. In real production systems, you want to verify if switching payment methods resets the idempotency key or leaves unresolved promises in flight.";
+      }
       if (q.includes('hint') || q.includes('next') || q.includes('help')) {
         return "Look at `src/services/checkoutApi.js`. When the server returns a 504 status, `fetch` doesn't reject automatically—it resolves with `response.ok = false`. You need to check `response.ok`, throw a custom error, and wrap the call in a retry loop (e.g., up to 3 retries). Also inspect `calculateCartTotal` for floating point rounding.";
       }
@@ -90,6 +94,10 @@ export default function AIAssistantTool({
     const query = textToSend || input;
     if (!query.trim()) return;
 
+    if (onAskQuestion) {
+      onAskQuestion(query);
+    }
+
     const userMessage = {
       id: `u-${Date.now()}`,
       sender: 'user',
@@ -133,6 +141,14 @@ export default function AIAssistantTool({
       <div className="quick-prompts-bar">
         <button 
           className="quick-prompt-pill"
+          onClick={() => handleSend("Does the API return the same response when the payment method changes?")}
+        >
+          <HelpCircle size={13} className="text-cyan" />
+          <span>Ask: "Does API return same response when payment method changes?"</span>
+        </button>
+
+        <button 
+          className="quick-prompt-pill"
           onClick={() => handleSend("Can you give me a hint on what to investigate next?")}
         >
           <Lightbulb size={13} className="text-warning" />
@@ -145,14 +161,6 @@ export default function AIAssistantTool({
         >
           <CheckCircle size={13} className="text-success" />
           <span>Review Current Progress</span>
-        </button>
-
-        <button 
-          className="quick-prompt-pill"
-          onClick={() => handleSend("What is the root cause of this incident?")}
-        >
-          <HelpCircle size={13} className="text-accent" />
-          <span>Root Cause Explanation</span>
         </button>
       </div>
 

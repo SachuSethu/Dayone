@@ -111,16 +111,57 @@ export default function WorkspaceRenderer({
     actionsCount: 0
   });
 
-  // Countdown timer
+  // Elapsed seconds tracking & countdown
   const [secondsRemaining, setSecondsRemaining] = useState(estimatedDurationMinutes * 60);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [latestToast, setLatestToast] = useState(null);
+
+  // Step 9: Work Observation Signals quietly collected by DayOne
+  const [workSignals, setWorkSignals] = useState({
+    investigatedCode: false,
+    reproducedIssue: false,
+    askedQuestion: false,
+    identifiedDependency: false,
+    testedHypothesis: false,
+    hintsUsed: 0
+  });
+
+  // Step 10: Chaos Event State
+  const [chaosEvent, setChaosEvent] = useState({
+    active: false,
+    triggered: false,
+    resolved: false,
+    decision: null
+  });
+
+  // Edge case toggle for Step 13 demonstration
+  const [hasEdgeCaseFailure, setHasEdgeCaseFailure] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setSecondsRemaining(prev => Math.max(0, prev - 1));
+      setElapsedSeconds(prev => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Auto-trigger Chaos Event after 25 seconds of work if not yet triggered
+  useEffect(() => {
+    if (!chaosEvent.triggered && elapsedSeconds >= 25) {
+      setChaosEvent(prev => ({ ...prev, active: true, triggered: true }));
+    }
+  }, [elapsedSeconds, chaosEvent.triggered]);
+
+  // Track signals based on active tools
+  useEffect(() => {
+    if (activeToolId === 'editor') {
+      setWorkSignals(prev => ({ ...prev, investigatedCode: true, identifiedDependency: true }));
+    } else if (activeToolId === 'terminal') {
+      setWorkSignals(prev => ({ ...prev, testedHypothesis: true }));
+    } else if (activeToolId === 'browser' || activeToolId === 'jira') {
+      setWorkSignals(prev => ({ ...prev, reproducedIssue: true }));
+    }
+  }, [activeToolId]);
 
   // Listen to simulation events for pop-up toast notifications
   useEffect(() => {
@@ -133,6 +174,7 @@ export default function WorkspaceRenderer({
 
   // Handlers for state updates from tools
   const handleFeCodeUpdate = (isPatched) => {
+    setWorkSignals(prev => ({ ...prev, investigatedCode: true, testedHypothesis: true }));
     setWorkspaceState(prev => ({
       ...prev,
       feCodePatched: isPatched,
@@ -141,6 +183,7 @@ export default function WorkspaceRenderer({
   };
 
   const handleFeTestsPass = () => {
+    setWorkSignals(prev => ({ ...prev, testedHypothesis: true }));
     setWorkspaceState(prev => ({
       ...prev,
       testsPassed: true,
@@ -238,12 +281,56 @@ export default function WorkspaceRenderer({
         <div className="workspace-submit-action">
           <button 
             className={`btn btn-submit-evaluation ${isReadyForSubmission() ? 'btn-ready' : ''}`}
-            onClick={() => onSubmitForEvaluation(workspaceState)}
+            onClick={() => onSubmitForEvaluation({
+              ...workspaceState,
+              elapsedSeconds,
+              workSignals,
+              chaosResolved: chaosEvent.resolved,
+              hasEdgeCaseFailure
+            })}
           >
             <Award size={16} />
-            <span>Submit for Evaluation</span>
+            <span>Submit for AI Code Review</span>
             <ArrowRight size={16} />
           </button>
+        </div>
+      </div>
+
+      {/* STEP 9: AI Manager Quiet Evidence Collection Banner */}
+      <div className="work-observation-bar">
+        <div className="obs-label">
+          <Bot size={14} className="text-cyan" />
+          <span>WORK OBSERVATION:</span>
+        </div>
+        <div className="obs-chips">
+          <span className={`obs-chip ${workSignals.investigatedCode ? 'done' : ''}`}>
+            {workSignals.investigatedCode ? '✓' : '○'} Investigated existing code
+          </span>
+          <span className={`obs-chip ${workSignals.reproducedIssue ? 'done' : ''}`}>
+            {workSignals.reproducedIssue ? '✓' : '○'} Reproduced issue
+          </span>
+          <span className={`obs-chip ${workSignals.askedQuestion ? 'done' : ''}`}>
+            {workSignals.askedQuestion ? '✓' : '○'} Asked clarifying question
+          </span>
+          <span className={`obs-chip ${workSignals.identifiedDependency ? 'done' : ''}`}>
+            {workSignals.identifiedDependency ? '✓' : '○'} Identified state dependency
+          </span>
+          <span className={`obs-chip ${workSignals.testedHypothesis ? 'done' : ''}`}>
+            {workSignals.testedHypothesis ? '✓' : '○'} Tested hypothesis
+          </span>
+          <span className="obs-chip hint-tag">
+            Hint used: {workSignals.hintsUsed}
+          </span>
+        </div>
+        <div className="edge-case-demo-toggle">
+          <label title="Toggle edge case discovery for Step 13 / 14 Skill Sprint flow">
+            <input 
+              type="checkbox" 
+              checked={hasEdgeCaseFailure}
+              onChange={(e) => setHasEdgeCaseFailure(e.target.checked)}
+            />
+            <span>Test Edge Case (Step 13 Sprint)</span>
+          </label>
         </div>
       </div>
 
@@ -297,6 +384,8 @@ export default function WorkspaceRenderer({
             onCodeUpdate={handleFeCodeUpdate}
             onTestsPass={handleFeTestsPass}
             onGitCommit={handleFeGitCommit}
+            onAskQuestion={() => setWorkSignals(p => ({ ...p, askedQuestion: true }))}
+            onApplyHint={() => setWorkSignals(p => ({ ...p, hintsUsed: p.hintsUsed + 1 }))}
             // Cybersecurity specific callbacks
             onContainThreat={handleContainThreat}
             // Designer specific callbacks
@@ -309,6 +398,86 @@ export default function WorkspaceRenderer({
           </div>
         )}
       </div>
+
+      {/* STEP 10: CHAOS EVENT MODAL */}
+      {chaosEvent.active && (
+        <div className="chaos-modal-backdrop">
+          <div className="chaos-modal-card animate-scale-in">
+            <div className="chaos-modal-header">
+              <div className="chaos-badge">
+                <AlertTriangle size={14} className="text-amber" />
+                <span>STEP 10 — 💥 CHAOS EVENT</span>
+              </div>
+              <h3 className="chaos-title">Unexpected Sprint Disruption</h3>
+              <p className="chaos-subtitle">DayOne measures real workplace behaviour under sudden scope changes.</p>
+            </div>
+
+            <div className="chaos-slack-simulation">
+              <div className="slack-msg-row">
+                <span className="slack-avatar">👩‍💻</span>
+                <div>
+                  <div className="slack-user-header">
+                    <strong>Maya</strong> <span className="slack-role-tag">QA Engineer</span> <span className="slack-time">Just now</span>
+                  </div>
+                  <p className="slack-quote">"Update: I found another issue. The same problem occurs on mobile Safari."</p>
+                </div>
+              </div>
+
+              <div className="slack-msg-row pm-row">
+                <span className="slack-avatar">👨‍💼</span>
+                <div>
+                  <div className="slack-user-header">
+                    <strong>Alex</strong> <span className="slack-role-tag">Product Manager</span> <span className="slack-time">Just now</span>
+                  </div>
+                  <p className="slack-quote">"Can we get this fixed before today's release?"</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="chaos-decision-prompt">
+              <div className="prompt-label">How do you respond and prioritize?</div>
+              <div className="decision-options-list">
+                <button 
+                  type="button"
+                  className="btn-decision-opt recommended"
+                  onClick={() => {
+                    setChaosEvent({ active: false, triggered: true, resolved: true, decision: 'prioritize_p1' });
+                    setWorkspaceState(p => ({ ...p, chaosResolved: true }));
+                  }}
+                >
+                  <div className="opt-title">1. Deliver primary P1 fix first, then branch mobile Safari fix</div>
+                  <p className="opt-sub">Communicate in Slack: "I will patch the checkout timeout first for today's release, then immediately investigate Safari WebKit in a hotfix branch."</p>
+                  <span className="badge-tag green">Recommended: High Prioritization & Communication</span>
+                </button>
+
+                <button 
+                  type="button"
+                  className="btn-decision-opt"
+                  onClick={() => {
+                    setChaosEvent({ active: false, triggered: true, resolved: true, decision: 'pivot_safari' });
+                    setWorkspaceState(p => ({ ...p, chaosResolved: true }));
+                  }}
+                >
+                  <div className="opt-title">2. Immediately halt desktop work to investigate mobile Safari</div>
+                  <p className="opt-sub">Switches context mid-task without completing the core timeout resolution.</p>
+                </button>
+
+                <button 
+                  type="button"
+                  className="btn-decision-opt"
+                  onClick={() => {
+                    setChaosEvent({ active: false, triggered: true, resolved: true, decision: 'ask_logs' });
+                    setWorkspaceState(p => ({ ...p, chaosResolved: true }));
+                  }}
+                >
+                  <div className="opt-title">3. Ask Maya for Safari console logs while continuing test run</div>
+                  <p className="opt-sub">Gathers telemetry while keeping current sprint pipeline moving forward.</p>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notification Banner for Real-Time Simulation Events */}
       {latestToast && (

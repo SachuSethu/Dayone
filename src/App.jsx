@@ -7,6 +7,7 @@ import TargetRoleSelector from './components/resume/TargetRoleSelector';
 import ResumeUploader from './components/resume/ResumeUploader';
 import AnalysisProgress from './components/resume/AnalysisProgress';
 import CandidateProfileView from './components/resume/CandidateProfileView';
+import ResumeRejectionModal from './components/resume/ResumeRejectionModal';
 import SimulationEngine from './components/SimulationEngine';
 
 import { ROLES_DATASET } from './lib/roles/roles';
@@ -50,6 +51,7 @@ export default function App() {
   // Upload & Extraction state
   const [uploadedResumeMeta, setUploadedResumeMeta] = useState(null);
   const [analysisError, setAnalysisError] = useState(null);
+  const [rejectionData, setRejectionData] = useState(null);
 
   // AI & Gap state
   const [candidateProfile, setCandidateProfile] = useState(null);
@@ -95,6 +97,17 @@ export default function App() {
         selectedRole.name,
         selectedRole.skills
       );
+
+      // Strict AI Evaluation Standard: Reject resume if no accredited certifications and no documented projects
+      if (profile && profile.isRejected) {
+        setRejectionData({
+          reason: profile.rejectionReason || 'Accredited Certification Credentials or Documented Project Deliverables Required.',
+          fileName: payload.fileName
+        });
+        setCurrentStage(APP_STAGES.UPLOAD_RESUME);
+        return;
+      }
+
       setCandidateProfile(profile);
 
       // 3. Deterministic Gap Engine Computation
@@ -129,14 +142,17 @@ export default function App() {
   };
 
   // Step 3: Launch Live First-Day Simulation
-  const handleStartSimulation = (taskOverride = null) => {
+  const handleStartSimulation = (taskOverride = null, allTasks = [], taskIdx = 0, level = 2) => {
     const liveSimData = buildSimulationMissionData({
       targetRole: selectedRole,
       candidateProfile,
       skillGaps,
       priorityGaps,
       aiMission: generatedMission,
-      assignedTask: taskOverride
+      assignedTask: taskOverride,
+      allAssignedTasks: allTasks && allTasks.length > 0 ? allTasks : (taskOverride ? [taskOverride] : []),
+      taskIndex: taskIdx,
+      candidateLevel: level
     });
     setSimulationMissionData(liveSimData);
     setCurrentStage(APP_STAGES.SIMULATION);
@@ -206,6 +222,14 @@ export default function App() {
           onLogout={handleLogout}
           initialMissionData={simulationMissionData}
           onSelectNewRole={handleResetToRoles}
+        />
+      )}
+
+      {/* Pop-up modal if resume was rejected per Strict AI Standards */}
+      {rejectionData && (
+        <ResumeRejectionModal 
+          rejectionData={rejectionData}
+          onReEnter={() => setRejectionData(null)}
         />
       )}
     </div>
