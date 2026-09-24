@@ -9,7 +9,7 @@ import { selectAssignedTasksForCandidate } from '../data/taskDatabase';
 import { getLevelInfo, getNextLevel } from '../lib/skills/statsEngine';
 import { 
   Sparkles, Layers, Shield, Award, Terminal, 
-  ChevronRight, RefreshCw, Cpu, LogOut, CheckCircle2, LayoutDashboard
+  ChevronRight, RefreshCw, Cpu, LogOut, CheckCircle2, LayoutDashboard, ArrowLeft
 } from 'lucide-react';
 
 const STAGES = {
@@ -24,7 +24,8 @@ export default function SimulationEngine({
   onLogout, 
   initialMissionData = null, 
   onSelectNewRole: propOnSelectNewRole = null,
-  onViewDashboard = null
+  onViewDashboard = null,
+  onBackToHome = null
 }) {
   const [currentStage, setCurrentStage] = useState(
     initialMissionData ? STAGES.WORKSPACE : STAGES.ROLE_SELECT
@@ -191,9 +192,36 @@ export default function SimulationEngine({
     <div className="simulation-engine-app">
       {/* Global Engine Stepper / Breadcrumbs */}
       <header className="engine-top-nav">
-        <div className="nav-brand-group">
-          <div className="brand-logo-mark">DayOne<span>.ai</span></div>
-          <span className="platform-tag">Role Simulation Engine</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {onBackToHome && (
+            <button 
+              type="button" 
+              onClick={onBackToHome}
+              title="Exit Simulation & Return to DayOne Platform Hub"
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#fff',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                transition: 'all 0.2s'
+              }}
+            >
+              <ArrowLeft size={15} />
+              <span>Exit to Hub</span>
+            </button>
+          )}
+
+          <div className="nav-brand-group" onClick={onBackToHome} style={{ cursor: onBackToHome ? 'pointer' : 'default' }}>
+            <div className="brand-logo-mark">DayOne<span>.ai</span></div>
+            <span className="platform-tag">Role Simulation Engine</span>
+          </div>
         </div>
 
         {/* Dynamic Workflow Stepper */}

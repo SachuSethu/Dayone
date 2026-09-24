@@ -12,7 +12,7 @@ import SkillRemarkModal from './SkillRemarkModal';
 import { calculateEvidenceHistogram } from '../../lib/skills/gapEngine';
 import { 
   Sparkles, Target, Compass, Award, AlertTriangle, 
-  ChevronRight, ArrowRight, Shield, CheckCircle2, TrendingUp, 
+  ChevronRight, ArrowRight, ArrowLeft, Shield, CheckCircle2, TrendingUp, 
   Layers, Clock, HelpCircle, Eye, Play, BarChart3, RefreshCw,
   GraduationCap, Briefcase, AlertOctagon, FileCode2, Info, BookOpen,
   CheckSquare, Check, Flag, UserCheck, LayoutDashboard
@@ -30,7 +30,8 @@ export default function CandidateProfileView({
   generatedMission,
   onStartSimulation,
   onReset,
-  onOpenDashboard 
+  onOpenDashboard,
+  onBackToHome = null
 }) {
   const [selectedSkillForModal, setSelectedSkillForModal] = useState(null);
   const [chartViewMode, setChartViewMode] = useState('radar'); // 'radar' | 'barchart' | 'histogram' | 'bars'
@@ -118,9 +119,41 @@ export default function CandidateProfileView({
     <div className="candidate-profile-page">
       {/* Top Banner Navigation */}
       <header className="target-role-header">
-        <div className="brand-group">
-          <div className="brand-logo-mark">DayOne<span>.ai</span></div>
-          <span className="platform-tag">AI Evaluation & Gap Diagnostics</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {onBackToHome && (
+            <button 
+              type="button" 
+              onClick={onBackToHome}
+              title="Return to DayOne.ai Platform Hub"
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#fff',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                transition: 'all 0.2s'
+              }}
+            >
+              <ArrowLeft size={15} />
+              <span>Back to Hub</span>
+            </button>
+          )}
+
+          <div 
+            className="brand-group" 
+            onClick={onBackToHome}
+            style={{ cursor: onBackToHome ? 'pointer' : 'default' }}
+            title={onBackToHome ? "Return to DayOne.ai Platform Hub" : undefined}
+          >
+            <div className="brand-logo-mark">DayOne<span>.ai</span></div>
+            <span className="platform-tag">AI Evaluation & Gap Diagnostics</span>
+          </div>
         </div>
 
         <div className="flow-stepper">
@@ -178,6 +211,72 @@ export default function CandidateProfileView({
 
       {/* Main Content Area */}
       <div className="candidate-profile-container">
+        {/* Back Navigation Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {onBackToHome && (
+              <button 
+                type="button" 
+                onClick={onBackToHome}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#38bdf8',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  padding: '0.4rem 0.8rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                <ArrowLeft size={14} /> Back to Hub
+              </button>
+            )}
+            <button 
+              type="button" 
+              onClick={onReset}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              <RefreshCw size={13} /> Change Resume / Role
+            </button>
+          </div>
+
+          {onOpenDashboard && (
+            <button 
+              type="button" 
+              onClick={onOpenDashboard}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                background: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.25)',
+                color: '#34d399',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                padding: '0.4rem 0.85rem',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              <LayoutDashboard size={14} /> My Candidate Dashboard →
+            </button>
+          )}
+        </div>
+
         {/* Profile Standards Notice */}
         <div className="estimated-profile-disclaimer">
           <Shield size={18} className="disclaimer-shield-icon" />

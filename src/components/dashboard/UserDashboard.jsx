@@ -117,12 +117,20 @@ export default function UserDashboard({
   onStartSimulation,
   onSelectRole,
   currentLevel = 2,
-  initialTab = 'growth'
+  initialTab = 'growth',
+  onReturnToCompany = null
 }) {
   const [dashboard, setDashboard] = useState(() => getUserDashboard());
   const [activeTab, setActiveTab] = useState(initialTab);
   const [selectedCredential, setSelectedCredential] = useState(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // Sync activeTab when initialTab prop updates
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Listen for real-time dashboard update events
   useEffect(() => {
@@ -225,7 +233,12 @@ export default function UserDashboard({
       <aside className={`dashboard-sidebar ${mobileSidebarOpen ? 'mobile-open' : ''}`}>
         {/* Sidebar Brand Header */}
         <div className="sidebar-brand-header">
-          <div className="flex-row items-center gap-2.5">
+          <div 
+            className="flex-row items-center gap-2.5" 
+            onClick={onBack}
+            style={{ cursor: 'pointer' }}
+            title="Return to DayOne Platform Hub"
+          >
             <div className="sidebar-brand-logo font-mono">D1</div>
             <div>
               <div className="brand-logo-text">DayOne<span>.ai</span></div>
@@ -238,6 +251,33 @@ export default function UserDashboard({
             onClick={() => setMobileSidebarOpen(false)}
           >
             <X size={18} />
+          </button>
+        </div>
+
+        {/* Quick Back to Hub Button in Sidebar */}
+        <div style={{ padding: '0.75rem 1rem 0 1rem' }}>
+          <button 
+            type="button" 
+            onClick={onBack}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '8px',
+              padding: '0.55rem',
+              color: '#38bdf8',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+          >
+            <ArrowLeft size={14} />
+            <span>← Back to Platform Hub</span>
           </button>
         </div>
 
@@ -337,6 +377,30 @@ export default function UserDashboard({
               title="Open Navigation Menu"
             >
               <Menu size={20} />
+            </button>
+
+            {/* Prominent Back to Platform Hub Navigation Button */}
+            <button 
+              type="button"
+              onClick={onBack}
+              title="Return to DayOne.ai Platform Hub"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: '8px',
+                padding: '0.42rem 0.85rem',
+                color: '#fff',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <ArrowLeft size={15} />
+              <span>Back to Hub</span>
             </button>
 
             <div className="topbar-breadcrumb">

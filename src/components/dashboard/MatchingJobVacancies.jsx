@@ -24,6 +24,7 @@ import {
 import { MARKET_STATISTICS } from '../../data/matchingJobs';
 import { findMicroCourseForWeakness } from '../../data/microCourses';
 import { apiGetJobRecommendation } from '../../lib/api/client';
+import { recordApplicationForCompany } from '../../lib/company/companyStore';
 
 export default function MatchingJobVacancies({ dashboard }) {
   const [selectedJobForModal, setSelectedJobForModal] = useState(null);
@@ -178,6 +179,28 @@ export default function MatchingJobVacancies({ dashboard }) {
           coverNote
         }
       };
+
+      // Transmit to corresponding company application receiver & AI CV shortlisting engine
+      try {
+        recordApplicationForCompany({
+          companyId: selectedJobForModal.companyId || (selectedJobForModal.company?.toLowerCase().includes('technova') ? 'company_001' : (selectedJobForModal.company?.toLowerCase().includes('pixel') ? 'company_002' : (selectedJobForModal.company?.toLowerCase().includes('secure') ? 'company_003' : 'company_001'))),
+          company: selectedJobForModal.company,
+          jobId: selectedJobForModal.id,
+          jobTitle: selectedJobForModal.title,
+          candidateName: candidate.name || 'Candidate',
+          candidateTag: '#C-' + Math.floor(1000 + Math.random() * 9000),
+          candidateRole: candidate.targetRole || selectedJobForModal.title,
+          candidateHeadline: candidate.headline || 'Verified DayOne Candidate',
+          readinessScore: currentScore,
+          candidateVector: candidate19Vector,
+          jobRequiredSkills: selectedJobForModal.requiredSkills || {},
+          location: candidate.location || 'Remote',
+          cvName: cvFileName,
+          coverNote
+        });
+      } catch (err) {
+        console.warn('Could not record application for company:', err);
+      }
 
       setAppliedJobsData(updated);
       localStorage.setItem('dayone_applied_jobs', JSON.stringify(updated));

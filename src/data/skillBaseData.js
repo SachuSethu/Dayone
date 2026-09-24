@@ -410,8 +410,17 @@ export function evaluateCandidateSuitability(candidateVector) {
  * AllowApplication(J) = JobCriteriaScore(J) >= 75%
  */
 export function evaluateCompanyJobsForCandidate(candidateVector, targetRoleId = null) {
-  return SKILLBASE_COMPANY_JOBS.map(job => {
-    const reqs = job.requiredSkills;
+  // Merge static jobs with dynamic company-posted vacancies
+  let dynamicJobs = [];
+  try {
+    const saved = localStorage.getItem('dayone_company_jobs');
+    if (saved) dynamicJobs = JSON.parse(saved);
+  } catch (e) {}
+
+  const allJobs = [...dynamicJobs, ...SKILLBASE_COMPANY_JOBS];
+
+  return allJobs.map(job => {
+    const reqs = job.requiredSkills || {};
     const skillKeys = Object.keys(reqs);
     let sumRatio = 0;
     const skillGaps = [];

@@ -15,7 +15,8 @@ export default function ResumeUploader({
   onSubmitResume, 
   currentUser,
   savedResume = null,
-  onOpenDashboard = null
+  onOpenDashboard = null,
+  onBackToHome = null
 }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -156,9 +157,40 @@ export default function ResumeUploader({
     <div className="resume-uploader-page">
       {/* Top Banner Navigation */}
       <header className="target-role-header">
-        <div className="brand-group">
-          <div className="brand-logo-mark">DayOne<span>.ai</span></div>
-          <span className="platform-tag">Job-Readiness Intelligence</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            type="button" 
+            onClick={onBack}
+            disabled={isProcessing}
+            title="Back to Target Role"
+            style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#fff',
+              padding: '0.45rem 0.85rem',
+              borderRadius: '8px',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              cursor: isProcessing ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            <ArrowLeft size={15} />
+            <span>Back</span>
+          </button>
+
+          <div 
+            className="brand-group" 
+            onClick={onBackToHome || onBack}
+            style={{ cursor: 'pointer' }}
+            title="Return to DayOne.ai Platform Hub"
+          >
+            <div className="brand-logo-mark">DayOne<span>.ai</span></div>
+            <span className="platform-tag">Job-Readiness Intelligence</span>
+          </div>
         </div>
 
         <div className="flow-stepper">
@@ -207,10 +239,24 @@ export default function ResumeUploader({
       <div className="resume-uploader-container">
         {/* Breadcrumb / Back button */}
         <div className="uploader-header-meta">
-          <button className="btn-back-link" onClick={onBack} disabled={isProcessing}>
-            <ArrowLeft size={15} />
-            <span>Change Target Role</span>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button className="btn-back-link" onClick={onBack} disabled={isProcessing}>
+              <ArrowLeft size={15} />
+              <span>Change Target Role</span>
+            </button>
+            {onBackToHome && (
+              <button 
+                type="button" 
+                className="btn-back-link" 
+                onClick={onBackToHome} 
+                disabled={isProcessing}
+                style={{ color: '#38bdf8' }}
+              >
+                <ArrowLeft size={15} />
+                <span>Back to Hub</span>
+              </button>
+            )}
+          </div>
           <div className="active-target-pill">
             <span className="pill-prefix">Evaluating For:</span>
             <strong className="pill-name">{targetRole?.name}</strong>

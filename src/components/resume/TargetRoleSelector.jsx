@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { ROLES_DATASET } from '../../lib/roles/roles';
 import { 
-  Code2, Server, ShieldAlert, Palette, BarChart2, 
+  ArrowLeft, Code2, Server, ShieldAlert, Palette, BarChart2, 
   ArrowRight, CheckCircle2, TrendingUp, Sparkles, LogOut, Briefcase
 } from 'lucide-react';
 
@@ -22,7 +22,8 @@ export default function TargetRoleSelector({
   onLogout, 
   savedResume = null,
   onUploadNewResume = null,
-  onOpenDashboard = null
+  onOpenDashboard = null,
+  onBackToHome = null
 }) {
   const [selectedRoleId, setSelectedRoleId] = useState('frontend-developer');
 
@@ -38,9 +39,41 @@ export default function TargetRoleSelector({
     <div className="target-role-page">
       {/* Top Banner Navigation */}
       <header className="target-role-header">
-        <div className="brand-group">
-          <div className="brand-logo-mark">DayOne<span>.ai</span></div>
-          <span className="platform-tag">Job-Readiness Intelligence</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {onBackToHome && (
+            <button 
+              type="button" 
+              onClick={onBackToHome}
+              title="Return to DayOne.ai Platform Hub"
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#fff',
+                padding: '0.45rem 0.85rem',
+                borderRadius: '8px',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                transition: 'all 0.2s'
+              }}
+            >
+              <ArrowLeft size={15} />
+              <span>Back to Hub</span>
+            </button>
+          )}
+
+          <div 
+            className="brand-group" 
+            onClick={onBackToHome}
+            style={{ cursor: onBackToHome ? 'pointer' : 'default' }}
+            title={onBackToHome ? "Return to DayOne.ai Platform Hub" : undefined}
+          >
+            <div className="brand-logo-mark">DayOne<span>.ai</span></div>
+            <span className="platform-tag">Job-Readiness Intelligence</span>
+          </div>
         </div>
 
         <div className="flow-stepper">
@@ -89,6 +122,28 @@ export default function TargetRoleSelector({
 
       {/* Main Content Container */}
       <div className="target-role-container">
+        {onBackToHome && (
+          <button 
+            type="button"
+            onClick={onBackToHome}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              background: 'transparent',
+              border: 'none',
+              color: '#38bdf8',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginBottom: '1rem',
+              padding: 0
+            }}
+          >
+            <ArrowLeft size={16} /> Back to DayOne Platform Hub
+          </button>
+        )}
+
         <div className="target-role-hero">
           <div className="hero-badge">
             <Sparkles size={14} className="sparkle-icon" />

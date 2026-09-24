@@ -3,12 +3,16 @@
 
 import React, { useState } from 'react';
 import AuthPage from './components/AuthPage';
+import HomePage from './components/home/HomePage';
+import AllJobsMicroCoursesView from './components/home/AllJobsMicroCoursesView';
+import InterviewPreparationView from './components/home/InterviewPreparationView';
 import TargetRoleSelector from './components/resume/TargetRoleSelector';
 import ResumeUploader from './components/resume/ResumeUploader';
 import AnalysisProgress from './components/resume/AnalysisProgress';
 import CandidateProfileView from './components/resume/CandidateProfileView';
 import SimulationEngine from './components/SimulationEngine';
 import UserDashboard from './components/dashboard/UserDashboard';
+import CompanyDashboard from './components/company/CompanyDashboard';
 
 import { ROLES_DATASET } from './lib/roles/roles';
 import { calculateSkillGaps, getPriorityAreas } from './lib/skills/gapEngine';
@@ -25,12 +29,16 @@ import './App.css';
 
 const APP_STAGES = {
   AUTH: 'AUTH',
+  HOME: 'HOME',
+  ALL_COURSES: 'ALL_COURSES',
+  INTERVIEW_PREP: 'INTERVIEW_PREP',
   SELECT_ROLE: 'SELECT_ROLE',
   UPLOAD_RESUME: 'UPLOAD_RESUME',
   ANALYZING: 'ANALYZING',
   PROFILE_VIEW: 'PROFILE_VIEW',
   SIMULATION: 'SIMULATION',
-  DASHBOARD: 'DASHBOARD'
+  DASHBOARD: 'DASHBOARD',
+  COMPANY_DASHBOARD: 'COMPANY_DASHBOARD'
 };
 
 export default function App() {
@@ -67,17 +75,27 @@ export default function App() {
   });
 
   const [currentStage, setCurrentStage] = useState(() => {
-    if (!localStorage.getItem('dayone_user')) return APP_STAGES.AUTH;
+    const userRaw = localStorage.getItem('dayone_user');
+    if (!userRaw) return APP_STAGES.AUTH;
+    try {
+      const u = JSON.parse(userRaw);
+      if (u.userType === 'company') return APP_STAGES.COMPANY_DASHBOARD;
+    } catch (e) {}
+
     const savedStage = localStorage.getItem('dayone_stage');
-    if (savedStage && [APP_STAGES.SELECT_ROLE, APP_STAGES.PROFILE_VIEW, APP_STAGES.SIMULATION].includes(savedStage)) {
+    if (savedStage === APP_STAGES.COMPANY_DASHBOARD) return APP_STAGES.COMPANY_DASHBOARD;
+    if (savedStage && Object.values(APP_STAGES).includes(savedStage)) {
       // If we have saved profile and gaps, restore profile view directly
       if (savedStage === APP_STAGES.PROFILE_VIEW && localStorage.getItem('dayone_candidate_profile')) {
         return APP_STAGES.PROFILE_VIEW;
       }
       return savedStage;
     }
-    return APP_STAGES.SELECT_ROLE;
+    return APP_STAGES.HOME;
   });
+
+  // Initial tab for UserDashboard when opened from specific actions (e.g. 'jobs' or 'growth')
+  const [dashboardTab, setDashboardTab] = useState('growth');
 
   // Upload & Extraction state
   const [uploadedResumeMeta, setUploadedResumeMeta] = useState(() => {
@@ -121,7 +139,7 @@ export default function App() {
 
   // Initialize or restore candidate profile dashboard from saved state
   React.useEffect(() => {
-    if (candidateProfile && selectedRole && !getUserDashboard()) {
+    if (candidateProfile && selectedRole && !getUserDashboard() && currentUser?.userType !== 'company') {
       initUserDashboard({
         candidateProfile,
         targetRole: selectedRole,
@@ -135,12 +153,39 @@ export default function App() {
   // Auth Handlers
   const handleLogin = (user) => {
     setCurrentUser(user);
-    setCurrentStage(APP_STAGES.SELECT_ROLE);
-    localStorage.setItem('dayone_stage', APP_STAGES.SELECT_ROLE);
+    if (user.userType === 'company') {
+      setCurrentStage(APP_STAGES.COMPANY_DASHBOARD);
+      localStorage.setItem('dayone_stage', APP_STAGES.COMPANY_DASHBOARD);
+    } else {
+      setCurrentStage(APP_STAGES.HOME);
+      localStorage.setItem('dayone_stage', APP_STAGES.HOME);
+    }
+  };
+
+  // Home Page 4-Option Navigation Hub Handler
+  const handleHomeSelectOption = (option) => {
+    if (option === 'courses') {
+      setCurrentStage(APP_STAGES.ALL_COURSES);
+      localStorage.setItem('dayone_stage', APP_STAGES.ALL_COURSES);
+    } else if (option === 'career_path') {
+      setCurrentStage(APP_STAGES.SELECT_ROLE);
+      localStorage.setItem('dayone_stage', APP_STAGES.SELECT_ROLE);
+    } else if (option === 'jobs') {
+      setDashboardTab('jobs');
+      setCurrentStage(APP_STAGES.DASHBOARD);
+      localStorage.setItem('dayone_stage', APP_STAGES.DASHBOARD);
+    } else if (option === 'interview_prep') {
+      setCurrentStage(APP_STAGES.INTERVIEW_PREP);
+      localStorage.setItem('dayone_stage', APP_STAGES.INTERVIEW_PREP);
+    } else {
+      setCurrentStage(APP_STAGES.HOME);
+      localStorage.setItem('dayone_stage', APP_STAGES.HOME);
+    }
   };
 
   const handleLogout = () => {
     localStorage.removeItem('dayone_user');
+    localStorage.removeItem('dayone_company_session');
     localStorage.removeItem('dayone_saved_resume');
     localStorage.removeItem('dayone_selected_role');
     localStorage.removeItem('dayone_candidate_profile');
@@ -291,7 +336,36 @@ export default function App() {
         <AuthPage onLogin={handleLogin} />
       )}
 
-      {/* 2. CHOOSE TARGET ROLE */}
+      {/* 0. PLATFORM HOME PAGE (HUB BEFORE JOB SELECTION) */}
+      {currentStage === APP_STAGES.HOME && currentUser?.userType !== 'company' && (
+        <HomePage 
+          currentUser={currentUser}
+          onSelectOption={handleHomeSelectOption}
+          onOpenDashboard={() => {
+            setDashboardTab('growth');
+            setCurrentStage(APP_STAGES.DASHBOARD);
+          }}
+          onLogout={handleLogout}
+        />
+      )}
+
+      {/* 0.1 ALL JOBS MICRO COURSES VIEW (OPTION 1) */}
+      {currentStage === APP_STAGES.ALL_COURSES && (
+        <AllJobsMicroCoursesView 
+          onBack={() => setCurrentStage(APP_STAGES.HOME)}
+        />
+      )}
+
+      {/* 0.2 INTERVIEW PREPARATION & AI EVALUATION (OPTION 4) */}
+      {currentStage === APP_STAGES.INTERVIEW_PREP && (
+        <InterviewPreparationView 
+          currentUser={currentUser}
+          initialRole={selectedRole?.id || 'frontend-developer'}
+          onBack={() => setCurrentStage(APP_STAGES.HOME)}
+        />
+      )}
+
+      {/* 2. CHOOSE TARGET ROLE (OPTION 2: CAREER PATH) */}
       {currentStage === APP_STAGES.SELECT_ROLE && (
         <TargetRoleSelector 
           onSelectRole={handleRoleSelected}
@@ -299,7 +373,11 @@ export default function App() {
           onLogout={handleLogout}
           savedResume={savedResume}
           onUploadNewResume={handleResetToUpload}
-          onOpenDashboard={() => setCurrentStage(APP_STAGES.DASHBOARD)}
+          onOpenDashboard={() => {
+            setDashboardTab('growth');
+            setCurrentStage(APP_STAGES.DASHBOARD);
+          }}
+          onBackToHome={() => setCurrentStage(APP_STAGES.HOME)}
         />
       )}
 
@@ -308,6 +386,7 @@ export default function App() {
         <ResumeUploader 
           targetRole={selectedRole}
           onBack={handleResetToRoles}
+          onBackToHome={() => setCurrentStage(APP_STAGES.HOME)}
           onSubmitResume={handleResumeSubmit}
           currentUser={currentUser}
           savedResume={savedResume}
@@ -333,6 +412,7 @@ export default function App() {
           generatedMission={generatedMission}
           onStartSimulation={handleStartSimulation}
           onReset={handleResetToUpload}
+          onBackToHome={() => setCurrentStage(APP_STAGES.HOME)}
           onOpenDashboard={() => setCurrentStage(APP_STAGES.DASHBOARD)}
         />
       )}
@@ -344,17 +424,27 @@ export default function App() {
           onLogout={handleLogout}
           initialMissionData={simulationMissionData}
           onSelectNewRole={handleResetToRoles}
+          onBackToHome={() => setCurrentStage(APP_STAGES.HOME)}
           onViewDashboard={() => setCurrentStage(APP_STAGES.DASHBOARD)}
         />
       )}
 
-      {/* 7. DYNAMIC CANDIDATE PROFILE DASHBOARD */}
-      {currentStage === APP_STAGES.DASHBOARD && (
+      {/* 7. DYNAMIC CANDIDATE PROFILE DASHBOARD (OPTION 3: JOB MATCHING / CAREER) */}
+      {currentStage === APP_STAGES.DASHBOARD && currentUser?.userType !== 'company' && (
         <UserDashboard 
-          onBack={() => setCurrentStage(candidateProfile ? APP_STAGES.PROFILE_VIEW : APP_STAGES.SELECT_ROLE)}
+          onBack={() => setCurrentStage(APP_STAGES.HOME)}
           onStartSimulation={handleStartSimulation}
           onSelectRole={handleResetToRoles}
           currentLevel={simulationMissionData?.candidateLevel || 2}
+          initialTab={dashboardTab}
+        />
+      )}
+
+      {/* 8. DAYONE COMPANY / EMPLOYER RECRUITER MODULE (Strictly Isolated - No Access to Candidate Personal Account) */}
+      {(currentStage === APP_STAGES.COMPANY_DASHBOARD || currentUser?.userType === 'company') && (
+        <CompanyDashboard 
+          currentUser={currentUser}
+          onLogout={handleLogout}
         />
       )}
     </div>
