@@ -30,6 +30,8 @@ import FutureWeaknessesPlan from './FutureWeaknessesPlan';
 import MatchingJobVacancies from './MatchingJobVacancies';
 import UserProfileEditor from './UserProfileEditor';
 import AtsResumeGenerator from './AtsResumeGenerator';
+import NotificationCenter from '../common/NotificationCenter';
+import { extract19SkillVector, evaluateCompanyJobsForCandidate } from '../../data/skillBaseData';
 
 const NAVIGATION_ITEMS = [
   {
@@ -181,6 +183,24 @@ export default function UserDashboard({
     const s = secs % 60;
     return `${m}m ${s < 10 ? '0' : ''}${s}s`;
   };
+
+  // SkillBase Dual-Gate evaluation for notifications
+  const evaluatedJobsForAlerts = useMemo(() => {
+    const vector = extract19SkillVector(dashboard?.skillsMatrix || []);
+    return evaluateCompanyJobsForCandidate(vector, candidate.roleId || 'frontend');
+  }, [dashboard?.skillsMatrix, candidate.roleId]);
+
+  const jobNotifications = useMemo(() => {
+    return (evaluatedJobsForAlerts || []).slice(0, 8).map(j => ({
+      id: j.id,
+      title: j.title,
+      company: j.company,
+      score: j.jobCriteriaScore,
+      unlocked: j.isUnlocked,
+      missingCount: j.skillGaps.length,
+      timestamp: new Date().toISOString()
+    }));
+  }, [evaluatedJobsForAlerts]);
 
   // Find active navigation item metadata
   let activeItemMeta = null;
@@ -337,6 +357,12 @@ export default function UserDashboard({
                 </span>
               )}
             </div>
+
+            {/* Live Notification & Intelligence Center */}
+            <NotificationCenter 
+              jobNotifications={jobNotifications}
+              onSelectJob={() => setActiveTab('jobs')}
+            />
 
             {onStartSimulation && (
               <button 

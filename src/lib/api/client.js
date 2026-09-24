@@ -133,3 +133,25 @@ export async function apiEvaluateTaskSolution(payload) {
     return null;
   }
 }
+
+/**
+ * 7. Get Personalized Job Recommendation with Gemini AI
+ */
+export async function apiGetJobRecommendation({ candidate, job, candidateVector, readinessScore }) {
+  try {
+    const res = await fetch('/api/ai/job-recommendation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate, job, candidateVector, readinessScore })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Job recommendation failed.');
+    }
+    return data.data;
+  } catch (err) {
+    console.warn('[apiGetJobRecommendation Warning]:', err.message);
+    return null;
+  }
+}

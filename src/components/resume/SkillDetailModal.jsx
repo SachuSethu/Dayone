@@ -93,17 +93,17 @@ export default function SkillDetailModal({ skill, onClose, onTestSkill }) {
           </div>
         )}
 
-        {/* Evidence Provenance Badge Strip */}
+        {/* Skill Verification Basis Strip */}
         <div className="modal-provenance-strip">
-          <span className="prov-strip-label">Evidence Verification Basis:</span>
-          {skill.hasCertification ? (
-            <span className="prov-chip cert"><GraduationCap size={13} /> Accredited Industry Certification</span>
-          ) : skill.hasProjectInfo ? (
-            <span className="prov-chip proj"><Briefcase size={13} /> Documented Project Implementation (No Cert Needed)</span>
-          ) : skill.isRemarkedInvalid ? (
-            <span className="prov-chip invalid"><AlertTriangle size={13} /> Unverified: Needs Valid Certification</span>
+          <span className="prov-strip-label">Skill Verification Basis:</span>
+          {skill.candidateEvidencePercent >= 75 ? (
+            <span className="prov-chip cert"><CheckCircle size={13} /> ⭐ Primary Technical Competency</span>
+          ) : skill.candidateEvidencePercent >= 50 ? (
+            <span className="prov-chip proj"><CheckCircle size={13} /> 📘 Documented Resume Skill</span>
+          ) : skill.candidateEvidencePercent >= 25 ? (
+            <span className="prov-chip mod"><Shield size={13} /> 💡 Developing Skill Baseline</span>
           ) : (
-            <span className="prov-chip zero"><AlertOctagon size={13} /> Missing Project Info / Uncertified (Scored 0%)</span>
+            <span className="prov-chip zero"><Compass size={13} /> 🎯 Simulation Baseline (To Be Validated)</span>
           )}
         </div>
 
@@ -125,7 +125,7 @@ export default function SkillDetailModal({ skill, onClose, onTestSkill }) {
               </ul>
             ) : (
               <p className="no-evidence-text">
-                No verified project info or accredited certification found in resume. Scored at 0% per strict AI evaluation policy.
+                Baseline role competency. Practical workplace simulation will establish verified demonstrated ability.
               </p>
             )}
           </div>

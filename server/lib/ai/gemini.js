@@ -44,9 +44,12 @@ function cleanAndParseJSON(rawText) {
 
 /**
  * 1. Analyze Resume with AI Evaluation
- * Enforces strict rules:
- * - Standalone courses without accredited certification do NOT count as a skill (value = 0).
- * - Projects must contain project info (technologies, description). If absent, project value is 0.0.
+ * POLICY: PURE SKILL EXTRACTION & SKILL-BASED STRENGTH/WEAKNESS DIAGNOSTICS
+ * - Does NOT consider, extract, or evaluate projects.
+ * - Does NOT consider, extract, require, or evaluate certifications.
+ * - Avoids projects and certifications completely.
+ * - Extracts technical skills directly from resume text.
+ * - Performs pure skill-based strength and weakness analysis.
  */
 export async function analyzeResume(resumeText, targetRole, roleRequirements = []) {
   if (!client) {
@@ -57,16 +60,23 @@ export async function analyzeResume(resumeText, targetRole, roleRequirements = [
   const prompt = `You are DayOne's AI Evaluation Engine for Resume Understanding.
 Analyze the candidate's uploaded resume text against the target role: "${targetRole}".
 
-EVALUATION GUIDELINES (NO MANDATORY CERTIFICATION / PROJECT BARRIERS):
-1. ACCESSIBLE & FAIR SKILL EVALUATION:
-   - Certifications and projects are NOT mandatory. Resumes must NEVER be rejected ("isRejected": false).
-   - Evaluate the candidate's skills based on all available evidence in the resume:
-     * Official industry credentials: 0.85 - 0.95
-     * Documented projects or work deliverables: 0.65 - 0.85
-     * Coursework, bootcamps, learning tutorials (Coursera, Udemy, etc.): 0.50 - 0.65
-     * Explicitly listed technical skills & competencies: 0.35 - 0.50
-     * Unmentioned core role skills: 0.15 - 0.25 (to be validated in workplace simulation)
-   - Do NOT mark skills as invalid or 0% for lacking certificates. Every candidate receives an authentic baseline profile.
+CRITICAL INSTRUCTIONS (AVOID PROJECTS & CERTIFICATIONS COMPLETELY):
+1. NO PROJECT OR CERTIFICATION EVALUATION:
+   - DO NOT extract, consider, evaluate, or require projects.
+   - DO NOT extract, consider, evaluate, or require certifications or certificates.
+   - Completely ignore whether projects or certifications are mentioned or absent.
+   - Resumes must NEVER be rejected ("isRejected": false).
+2. PURE SKILL-BASED EXTRACTION:
+   - Focus SOLELY and EXCLUSIVELY on extracting technical skills directly from the resume text.
+   - Evaluate each core skill required for "${targetRole}" based strictly on technical skill depth, keyword frequency, and applied context in the resume:
+     * High depth, prominent technical competency: 0.80 - 0.95 (evidenceLevel: "strong")
+     * Clear technical skill presence and usage: 0.60 - 0.79 (evidenceLevel: "moderate")
+     * Foundational or introductory skill mention: 0.35 - 0.59 (evidenceLevel: "developing")
+     * Minimal or absent technical skill mention: 0.15 - 0.30 (evidenceLevel: "foundational", to be validated in workplace simulation)
+3. SKILL-BASED STRENGTH & WEAKNESS ANALYSIS:
+   - Identify candidate's top skill strengths (skills where candidate demonstrates high proficiency and technical depth).
+   - Identify candidate's skill weaknesses / deficits (skills where proficiency is low or lacking relative to role requirements).
+   - For each strength and weakness, provide clear technical rationales.
 
 TARGET ROLE: ${targetRole}
 ROLE CORE SKILLS:
@@ -82,32 +92,32 @@ Return ONLY a single valid JSON object strictly matching this schema:
   "candidate": {
     "targetRole": "${targetRole}",
     "detectedName": "Candidate Name if found",
-    "summary": "2-sentence summary of experience indicated by resume"
+    "summary": "2-sentence summary of technical skills indicated by resume"
   },
-  "provenance": {
-    "verifiedCertifications": [
-      { "name": "Certification Name", "issuer": "Issuer", "verified": true }
-    ],
-    "unverifiedCourseClaims": [
-      { "courseName": "Course Name", "reason": "Coursework & learning noted" }
-    ],
-    "documentedProjects": [
-      { "name": "Project Name", "hasProjectInfo": true, "technologies": ["React", "CSS"] }
-    ]
-  },
+  "skillStrengths": [
+    {
+      "skill": "Skill Name",
+      "proficiency": 88,
+      "strengthRationale": "High technical depth and comprehensive usage demonstrated in resume."
+    }
+  ],
+  "skillWeaknesses": [
+    {
+      "skill": "Skill Name",
+      "proficiency": 25,
+      "deficit": "Core role requirement with minimal representation in resume.",
+      "priority": "high",
+      "weaknessRationale": "Requires practical demonstration in workplace simulation to establish competency."
+    }
+  ],
   "skills": [
     {
       "name": "Skill Name",
-      "resumeEvidence": 0.70,
-      "evidenceLevel": "moderate",
-      "hasProjectInfo": true,
-      "hasCertification": false,
-      "isRemarkedInvalid": false,
-      "remarkStatus": null,
-      "validationRemark": null,
-      "validationMethod": "Resume Evaluation",
+      "resumeEvidence": 0.80,
+      "evidenceLevel": "strong",
+      "validationMethod": "Resume Skill Profile",
       "evidence": [
-        "Identified from coursework, projects, or listed technical competencies."
+        "Extracted technical skill competency from candidate resume text."
       ]
     }
   ]
@@ -127,10 +137,19 @@ Return ONLY a single valid JSON object strictly matching this schema:
       throw new Error('AI Evaluation response did not contain required skills array.');
     }
 
+    const skillStrengths = Array.isArray(parsed.skillStrengths) ? parsed.skillStrengths : [];
+    const skillWeaknesses = Array.isArray(parsed.skillWeaknesses) ? parsed.skillWeaknesses : [];
+
     return {
       ...parsed,
-      isRejected: Boolean(parsed.isRejected),
-      rejectionReason: parsed.rejectionReason || null,
+      isRejected: false,
+      rejectionReason: null,
+      skillStrengths,
+      skillWeaknesses,
+      provenance: {
+        skillStrengths,
+        skillWeaknesses
+      },
       isDemoFallback: false
     };
   } catch (err) {
@@ -148,10 +167,12 @@ export async function analyzeSkillGaps(candidateProfile, roleRequirements, calcu
   }
 
   const prompt = `You are DayOne's Career Diagnostic Engine.
-Explain and prioritize the candidate's skill gaps against the target role requirements based on our strict AI Evaluation.
+Explain and prioritize the candidate's skill gaps against the target role requirements based purely on skill proficiency.
 
+CRITICAL INSTRUCTIONS:
+DO NOT mention projects or certifications. Avoid projects and certifications completely.
+Focus solely on technical skill competencies, skill depths, and practical demonstration in workplace simulation.
 Use neutral, constructive, and empowering language.
-If a candidate has a 0% evidence score due to lacking project details or missing certifications, note that practical simulation is the best way to prove the skill.
 
 TARGET ROLE: ${candidateProfile.targetRole}
 CALCULATED GAPS:
@@ -163,7 +184,7 @@ Return ONLY valid JSON:
     {
       "skill": "Testing",
       "priority": "high",
-      "reason": "High role demand (69%) with zero documented project info in resume. Practical simulation recommended.",
+      "reason": "High role demand with baseline skill presence in resume. Practical simulation will validate your applied ability.",
       "recommendedAction": "practical_validation"
     }
   ]
@@ -644,189 +665,89 @@ function generateFallbackTaskEvaluation({
 function generateFallbackResumeAnalysis(resumeText, targetRole, roleRequirements = []) {
   const textLower = (resumeText || '').toLowerCase();
   
-  // 1. Detect Accredited Industry Certifications
-  const verifiedCertifications = [];
-  const recognizedCertPatterns = [
-    /\b(aws\s+certified\s+[a-z0-9\s-]+)\b/i,
-    /\b(comptia\s+(?:security\+|network\+|a\+|cyso\+|casp\+|linux\+))\b/i,
-    /\b(cisco\s+certified\s+[a-z0-9\s-]+|ccna|ccnp|ccie)\b/i,
-    /\b(google\s+cloud\s+certified\s+[a-z0-9\s-]+)\b/i,
-    /\b(microsoft\s+certified\s+[a-z0-9\s-]+|azure\s+certified\s+[a-z0-9\s-]+)\b/i,
-    /\b(meta\s+certified\s+[a-z0-9\s-]+)\b/i,
-    /\b(certified\s+kubernetes\s+(?:administrator|application\s+developer)|cka|ckad)\b/i,
-    /\b(cissp|ceh|certified\s+information\s+systems\s+security\s+professional)\b/i,
-    /\b(certified\s+soc\s+analyst|csa)\b/i,
-    /\b(certified\s+scrum\s+master|csm)\b/i
-  ];
-
-  recognizedCertPatterns.forEach(pattern => {
-    const match = resumeText.match(pattern);
-    if (match) {
-      const matchText = match[0].trim();
-      const matchLower = matchText.toLowerCase();
-      const negRegex = new RegExp(`(?:no|without|not|lacks?|zero)\\s+[^.\\n]*?${matchLower.slice(0, 10)}`, 'i');
-      if (!negRegex.test(textLower)) {
-        if (!verifiedCertifications.some(c => c.name.toLowerCase() === matchLower)) {
-          verifiedCertifications.push({
-            name: matchText,
-            issuer: 'Accredited Credential Authority',
-            verified: true
-          });
-        }
-      }
-    }
-  });
-
-  // Explicit check: If text says "no certs", "no certifications", "no accredited certifications", empty the array
-  if (/(?:no|without|zero|lacks?)\s+(?:accredited\s+)?(?:certifications?|certs?|credentials?|licenses?)\b/i.test(textLower)) {
-    verifiedCertifications.length = 0;
-  }
-
-  // 2. Detect Unverified Course Claims (e.g. "udemy", "coursera", "bootcamp", "tutorial" WITHOUT credential)
-  const unverifiedCourseClaims = [];
-  const courseKeywords = ['udemy', 'coursera', 'bootcamp', 'codecademy', 'completed course', 'tutorial', 'youtube'];
-  courseKeywords.forEach(kw => {
-    if (textLower.includes(kw)) {
-      unverifiedCourseClaims.push({
-        courseName: `${kw.toUpperCase()} Coursework / Tutorial`,
-        reason: 'Course listed without official accredited certification credential (scored 0% per strict evaluation rules)'
-      });
-    }
-  });
-
-  // 3. Extract Section-Specific Content
-  let projectText = '';
-  const projectHeaderMatch = resumeText.match(/(?:^|\r?\n)\s*(?:featured\s+)?(?:technical\s+)?(?:projects?|work\s+experience|professional\s+experience|experience|deliverables|employment)(?:[^\r\n]*?)[:\r\n][\s\S]*?(?=(?:(?:^|\r?\n)\s*(?:education|certifications?|courses?|online\s+courses?|bootcamps?|skills?)(?:[^\r\n]*?)[:\r\n]|$))/i);
-  if (projectHeaderMatch) {
-    projectText = projectHeaderMatch[0].toLowerCase();
-  } else {
-    const lines = resumeText.split(/\r?\n/);
-    const projectLines = lines.filter(l => 
-      /(?:built|developed|engineered|implemented|designed|architected|deployed|created|fixed|migrated|refactored)\b/i.test(l) &&
-      !/(?:course|video|tutorial|bootcamp|lecture|watched|completed course)\b/i.test(l)
-    );
-    if (projectLines.length > 0) {
-      projectText = projectLines.join(' ').toLowerCase();
-    }
-  }
-
-  let courseText = '';
-  const courseHeaderMatch = resumeText.match(/(?:^|\r?\n)\s*(?:education|courses?|online\s+courses?|bootcamps?|certifications?)(?:[^\r\n]*?)[:\r\n][\s\S]*?(?=(?:(?:^|\r?\n)\s*(?:projects?|work\s+experience|experience|deliverables|skills?)(?:[^\r\n]*?)[:\r\n]|$))/i);
-  if (courseHeaderMatch) {
-    courseText = courseHeaderMatch[0].toLowerCase();
-  } else {
-    courseText = textLower;
-  }
-
-  const documentedProjects = [];
-  const projectTechs = roleRequirements.filter(r => projectText.includes(r.name.toLowerCase())).map(r => r.name);
-  const hasProjectVerbs = /(?:built|developed|engineered|implemented|designed|architected|deployed|created|fixed|migrated|refactored)\b/i.test(projectText);
-  const isNegativeProjectClaim = /(?:no\s+projects?|without\s+projects?|no\s+production\s+experience)\b/i.test(textLower);
-
-  if (projectText.length > 25 && (projectTechs.length > 0 || hasProjectVerbs) && !isNegativeProjectClaim) {
-    documentedProjects.push({
-      name: 'Documented Project Deliverables',
-      hasProjectInfo: true,
-      technologies: projectTechs
-    });
-  }
-
-  // Certifications and projects are NOT mandatory. Resumes are NEVER rejected.
-  const isRejected = false;
-  const rejectionReason = null;
-
-  // 4. Score Each Skill Fairly Across Multiple Evidence Sources
+  // Pure skill-based extraction from resume text - NO projects, NO certifications
   const skills = roleRequirements.map(req => {
     const skillNameLower = req.name.toLowerCase();
-    const isMentioned = textLower.includes(skillNameLower);
-    const isInsideProject = projectText.includes(skillNameLower);
-    const isInsideCert = verifiedCertifications.some(c => c.name.toLowerCase().includes(skillNameLower));
-    const isInsideCourse = courseText.includes(skillNameLower) || unverifiedCourseClaims.some(c => c.courseName.toLowerCase().includes(skillNameLower));
+    
+    // Check frequency and context of technical skill in resume text
+    const escapedName = skillNameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escapedName}\\b`, 'gi');
+    const matches = (textLower.match(regex) || []).length;
 
     let resumeEvidence = 0.20;
     let evidenceLevel = 'foundational';
-    let hasProjectInfo = isInsideProject;
-    let hasCertification = isInsideCert;
-    const isRemarkedInvalid = false;
-    const remarkStatus = null;
-    const validationRemark = null;
-    let validationMethod = 'Role Baseline';
+    let validationMethod = 'Simulation Baseline';
     const evidence = [];
 
-    // Branch A: Verified certification
-    if (isInsideCert) {
-      hasCertification = true;
-      resumeEvidence = 0.90;
+    if (matches >= 3) {
+      resumeEvidence = 0.88;
       evidenceLevel = 'strong';
-      validationMethod = 'Industry Certification Credential';
-      evidence.push(`Verified through industry credential in resume.`);
-    }
-    // Branch B: Documented project deliverables
-    else if (isInsideProject) {
-      hasProjectInfo = true;
-      const matches = (projectText.match(new RegExp(skillNameLower, 'g')) || []).length;
-      if (matches >= 3) {
-        resumeEvidence = 0.85;
-        evidenceLevel = 'strong';
-        evidence.push(`Supported by ${matches} active project implementations with architecture & code deliverables.`);
-      } else {
-        resumeEvidence = 0.70;
-        evidenceLevel = 'moderate';
-        evidence.push(`Active project implementation with technical deliverables.`);
-      }
-      validationMethod = 'Documented Project Deliverable';
-    }
-    // Branch C: Coursework, online learning or tutorials
-    else if (isInsideCourse) {
-      resumeEvidence = 0.55;
-      evidenceLevel = 'moderate';
-      validationMethod = 'Coursework & Learning';
-      evidence.push(`Acquired through technical coursework, tutorial completion, and structured study.`);
-    }
-    // Branch D: Mentioned in skills profile
-    else if (isMentioned) {
-      resumeEvidence = 0.45;
-      evidenceLevel = 'developing';
       validationMethod = 'Resume Skill Profile';
-      evidence.push(`Documented as technical competency in candidate resume profile.`);
-    }
-    // Branch E: Core role requirement to validate in simulation
-    else {
+      evidence.push(`High proficiency: "${req.name}" is referenced ${matches} times across candidate resume technical profile.`);
+    } else if (matches >= 1) {
+      resumeEvidence = 0.65;
+      evidenceLevel = 'moderate';
+      validationMethod = 'Resume Skill Profile';
+      evidence.push(`Documented competency: "${req.name}" identified directly in candidate resume technical profile.`);
+    } else {
       resumeEvidence = 0.20;
       evidenceLevel = 'foundational';
       validationMethod = 'Simulation Baseline';
-      evidence.push(`Foundational role competency to be evaluated in live workplace simulation.`);
+      evidence.push(`Baseline role competency: "${req.name}" to be evaluated dynamically during live workplace simulation.`);
     }
 
     return {
       name: req.name,
       resumeEvidence,
       evidenceLevel,
-      hasProjectInfo,
-      hasCertification,
-      isRemarkedInvalid,
-      remarkStatus,
-      validationRemark,
+      hasProjectInfo: false,
+      hasCertification: false,
+      isRemarkedInvalid: false,
+      remarkStatus: null,
+      validationRemark: null,
       validationMethod,
       validationStatus: 'validated',
       evidence
     };
   });
 
+  // Calculate purely skill-based strengths and weaknesses
+  const sortedByEvidence = [...skills].sort((a, b) => b.resumeEvidence - a.resumeEvidence);
+
+  const skillStrengths = sortedByEvidence
+    .filter(s => s.resumeEvidence >= 0.50)
+    .slice(0, 4)
+    .map(s => ({
+      skill: s.name,
+      proficiency: Math.round(s.resumeEvidence * 100),
+      strengthRationale: `Strong candidate competency: "${s.name}" is prominently documented in the resume profile.`
+    }));
+
+  const skillWeaknesses = [...sortedByEvidence]
+    .reverse()
+    .filter(s => s.resumeEvidence < 0.65)
+    .slice(0, 4)
+    .map(s => ({
+      skill: s.name,
+      proficiency: Math.round(s.resumeEvidence * 100),
+      deficit: `Limited or foundational representation in resume text.`,
+      priority: s.resumeEvidence <= 0.25 ? 'high' : 'medium',
+      weaknessRationale: `Core ${targetRole} requirement requiring applied validation in workplace simulation.`
+    }));
+
   return {
-    isRejected,
-    rejectionReason,
+    isRejected: false,
+    rejectionReason: null,
     candidate: {
       targetRole,
       detectedName: 'Candidate Profile',
-      summary: isRejected 
-        ? 'Resume rejected: Missing required accredited certifications and project documentation.' 
-        : `AI Evaluation conducted against ${targetRole} production criteria. Skills strictly audited against documented project info and accredited certifications.`
+      summary: `AI skill-based profile evaluated for ${targetRole}. Technical competencies extracted directly from resume.`
     },
+    skillStrengths,
+    skillWeaknesses,
     provenance: {
-      verifiedCertifications,
-      unverifiedCourseClaims,
-      documentedProjects
+      skillStrengths,
+      skillWeaknesses
     },
     skills,
     isDemoFallback: true
@@ -840,8 +761,8 @@ function generateFallbackGapReasoning(calculatedGaps) {
       skill: gap.skill,
       priority: gap.priority || 'high',
       reason: isZero
-        ? `${gap.skill} is a critical role requirement (${gap.roleRequirementPercent}%), but has 0% documented evidence due to missing project info and lack of accredited certification. Practical simulation will validate your actual ability.`
-        : `${gap.skill} is a core requirement (${gap.roleRequirementPercent}%), while your resume currently validates ${gap.candidateEvidencePercent}% project evidence.`,
+        ? `${gap.skill} is an essential role requirement (${gap.roleRequirementPercent}%), with baseline skill presence in resume. Practical simulation will validate your applied ability.`
+        : `${gap.skill} is a core requirement (${gap.roleRequirementPercent}%), while your resume indicates ${gap.candidateEvidencePercent}% documented skill baseline.`,
       recommendedAction: 'practical_validation'
     };
   });
@@ -864,5 +785,132 @@ function generateFallbackMission(targetRole, priorityGaps) {
     difficulty: 'intermediate',
     objective: `Investigate the failing service endpoint, implement safe error handling with retry logic, and verify that automated tests pass 100%.`,
     workplaceContext: `You are joining the platform engineering team during a sprint release.`
+  };
+}
+
+/**
+ * 5. Generate Personalized Job Recommendation Analysis with Gemini AI
+ * Evaluates candidate's verified skills, readiness score, and task achievements against a specific company opening.
+ */
+export async function generatePersonalizedJobRecommendation({
+  candidate = {},
+  job = {},
+  candidateVector = {},
+  readinessScore = 75
+}) {
+  if (!client) {
+    return generateFallbackJobRecommendation({ candidate, job, candidateVector, readinessScore });
+  }
+
+  const prompt = `You are DayOne.ai's AI Executive Recruiter & Career Diagnostic Engine.
+Evaluate the candidate's verified skills and readiness against this specific job opening.
+
+CANDIDATE PROFILE:
+- Name: ${candidate.name || 'Candidate'}
+- Target Role: ${candidate.targetRole || 'Software Engineer'}
+- Current Readiness Score: ${readinessScore}%
+- Candidate Skill Profile: ${JSON.stringify(candidateVector, null, 2)}
+
+JOB DETAILS:
+- Company: ${job.company}
+- Position: ${job.title}
+- Location: ${job.location}
+- Salary Range: ${job.salaryRange}
+- Job Description: ${job.description}
+- Required Skills & Thresholds: ${JSON.stringify(job.requiredSkills, null, 2)}
+
+INSTRUCTIONS:
+1. Calculate an accurate "aiFitScore" (0-100) based on how well the candidate's skills align with the job requirements.
+2. Determine "priorityTier":
+   - "top_fit": 80-100% (Priority #1 - Highly recommended for immediate application)
+   - "strong_fit": 65-79% (Priority #2 - Strong alignment with core responsibilities)
+   - "growth_fit": 50-64% (Priority #3 - Good potential with on-the-job expansion)
+   - "stretch_role": <50% (Priority #4 - Stretch career opportunity)
+3. Provide "recommendationHeadline": A crisp, encouraging 1-sentence headline.
+4. Provide "personalizedRationale": 2-3 sentences explaining exactly why this candidate stands out for this specific job based on their skills.
+5. Provide "competitiveStrengths": Array of 2-3 bullet points highlighting their highest-impact skills for this role.
+6. Provide "applicationAdvice": 1-2 actionable sentences advising what to emphasize in their application or interview.
+7. Provide "aiPitchNote": A pre-composed 3-sentence personalized cover note for the hiring manager highlighting candidate's verified skills.
+
+Return ONLY a single valid JSON object matching this schema:
+{
+  "aiFitScore": 88,
+  "priorityTier": "top_fit",
+  "recommendationHeadline": "High priority technical alignment for ${job.company}'s ${job.title} role.",
+  "personalizedRationale": "...",
+  "competitiveStrengths": ["...", "..."],
+  "applicationAdvice": "...",
+  "aiPitchNote": "..."
+}`;
+
+  try {
+    const response = await client.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const parsed = cleanAndParseJSON(response.text);
+    if (!parsed || typeof parsed.aiFitScore !== 'number') {
+      return generateFallbackJobRecommendation({ candidate, job, candidateVector, readinessScore });
+    }
+
+    return {
+      ...parsed,
+      isDemoFallback: false
+    };
+  } catch (err) {
+    console.error('[AI Evaluation generatePersonalizedJobRecommendation Error]:', err.message);
+    return generateFallbackJobRecommendation({ candidate, job, candidateVector, readinessScore });
+  }
+}
+
+export function generateFallbackJobRecommendation({ candidate = {}, job = {}, candidateVector = {}, readinessScore = 75 }) {
+  const reqs = job.requiredSkills || {};
+  const keys = Object.keys(reqs);
+  let totalRatio = 0;
+  const strengths = [];
+
+  keys.forEach(k => {
+    const cand = candidateVector[k] || 0;
+    const req = reqs[k] || 50;
+    const ratio = Math.min(cand / req, 1.0);
+    totalRatio += ratio;
+    if (cand >= req) {
+      strengths.push(`${k.toUpperCase()} exceeds company requirement (${cand}% vs ${req}% needed)`);
+    }
+  });
+
+  const rawScore = keys.length ? Math.round((totalRatio / keys.length) * 100) : readinessScore;
+  const aiFitScore = Math.max(30, Math.min(98, Math.round((rawScore * 0.7) + (readinessScore * 0.3))));
+
+  let priorityTier = 'growth_fit';
+  let tierLabel = 'Priority #3: Good Growth Fit';
+  if (aiFitScore >= 80) {
+    priorityTier = 'top_fit';
+    tierLabel = 'Priority #1: Top Recommendation';
+  } else if (aiFitScore >= 65) {
+    priorityTier = 'strong_fit';
+    tierLabel = 'Priority #2: Strong Match';
+  } else if (aiFitScore < 50) {
+    priorityTier = 'stretch_role';
+    tierLabel = 'Priority #4: Stretch Role';
+  }
+
+  const candidateName = candidate.name || 'Candidate';
+  const roleName = candidate.targetRole || job.title || 'Engineer';
+
+  return {
+    aiFitScore,
+    priorityTier,
+    tierLabel,
+    recommendationHeadline: `${tierLabel} for ${job.company} (${aiFitScore}% AI Fit).`,
+    personalizedRationale: `Based on your technical profile and verified ${roleName} competencies, your background directly aligns with ${job.company}'s tech stack. Your DayOne workplace simulation verification gives you an advantage over unverified resumes.`,
+    competitiveStrengths: strengths.length ? strengths.slice(0, 3) : [`Core competency in ${keys.slice(0, 2).join(' & ')}`, 'Demonstrated practical troubleshooting ability'],
+    applicationAdvice: `Highlight your hands-on simulation experience and readiness score (${readinessScore}%) in your application note.`,
+    aiPitchNote: `I am applying for the ${job.title} position at ${job.company}. With a verified ${readinessScore}% workplace readiness score on DayOne.ai and hands-on simulation experience in ${keys.slice(0, 2).join(' and ')}, I can contribute immediately with production-standard code and zero-regression reliability.`,
+    isDemoFallback: true
   };
 }

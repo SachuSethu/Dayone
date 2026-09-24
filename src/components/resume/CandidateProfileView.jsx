@@ -85,11 +85,34 @@ export default function CandidateProfileView({
   const gapCount = skillGaps.filter(g => g.alignmentStatus === 'high_priority_gap').length;
   const zeroEvidenceCount = skillGaps.filter(g => g.candidateEvidencePercent === 0).length;
 
-  const provenance = candidateProfile?.provenance || {
-    verifiedCertifications: [],
-    unverifiedCourseClaims: [],
-    documentedProjects: []
-  };
+  // Pure skill-based strengths and weaknesses
+  const fallbackStrengths = skillGaps
+    .filter(g => g.candidateEvidencePercent >= 60)
+    .slice(0, 4)
+    .map(g => ({
+      skill: g.skill,
+      proficiency: g.candidateEvidencePercent,
+      strengthRationale: `Demonstrates strong technical proficiency (${g.candidateEvidencePercent}%) from resume profile.`
+    }));
+
+  const fallbackWeaknesses = skillGaps
+    .filter(g => g.candidateEvidencePercent < 55)
+    .slice(0, 4)
+    .map(g => ({
+      skill: g.skill,
+      proficiency: g.candidateEvidencePercent,
+      deficit: `Foundational representation in resume profile.`,
+      priority: g.priority || 'high',
+      weaknessRationale: `Core ${targetRole?.name || 'role'} competency (${g.roleRequirementPercent}%) targeted for practical validation in workplace simulation.`
+    }));
+
+  const skillStrengths = candidateProfile?.skillStrengths?.length 
+    ? candidateProfile.skillStrengths 
+    : fallbackStrengths;
+
+  const skillWeaknesses = candidateProfile?.skillWeaknesses?.length 
+    ? candidateProfile.skillWeaknesses 
+    : fallbackWeaknesses;
 
   return (
     <div className="candidate-profile-page">
@@ -159,29 +182,9 @@ export default function CandidateProfileView({
         <div className="estimated-profile-disclaimer">
           <Shield size={18} className="disclaimer-shield-icon" />
           <div className="disclaimer-content">
-            <strong>AI Evaluation Standards:</strong> DayOne analyzes documented skills, project experience, and accredited credentials to calculate your initial benchmark. Real-world workplace proficiency is validated dynamically during DayOne’s live First-Day Simulation.
+            <strong>AI Evaluation Standards:</strong> DayOne extracts technical skills directly from your resume to calculate your baseline capability and diagnose skill strengths and improvement areas. Real-world workplace proficiency is validated dynamically during DayOne’s live First-Day Simulation.
           </div>
         </div>
-
-        {/* Remarked Skills Notice Banner */}
-        {remarkedSkills.length > 0 && (
-          <div className="remark-alert-banner">
-            <div className="remark-alert-left">
-              <AlertTriangle size={18} className="text-amber flex-shrink-0" />
-              <div>
-                <strong>Strict AI Evaluation Audit:</strong> {remarkedSkills.length} skill(s) carrying official evaluation remarks: <em>"This skill is not valid until you submit a valid certification."</em>
-              </div>
-            </div>
-            <button 
-              type="button" 
-              className="btn-view-remarks" 
-              onClick={() => setShowSkillRemarkModal(true)}
-            >
-              <span>Inspect {remarkedSkills.length} Remarked Skill{remarkedSkills.length > 1 ? 's' : ''}</span>
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        )}
 
         {/* Profile Header Card */}
         <div className="profile-hero-card">
@@ -213,18 +216,18 @@ export default function CandidateProfileView({
               <span className="stat-sub">Market benchmark fit</span>
             </div>
             <div className="stat-metric-box">
-              <span className="stat-label">Verified Strengths</span>
-              <span className="stat-number text-emerald">{strongCount}</span>
-              <span className="stat-sub">Strong project proof</span>
+              <span className="stat-label">Skill Strengths</span>
+              <span className="stat-number text-emerald">{skillStrengths.length || strongCount}</span>
+              <span className="stat-sub">Demonstrated proficiency</span>
             </div>
             <div className="stat-metric-box">
-              <span className="stat-label">Zero-Evidence Skills</span>
-              <span className="stat-number text-rose">{zeroEvidenceCount}</span>
-              <span className="stat-sub">Missing project info</span>
+              <span className="stat-label">Simulation Focus</span>
+              <span className="stat-number text-amber">{skillWeaknesses.length || gapCount}</span>
+              <span className="stat-sub">Needs practical validation</span>
             </div>
             <div className="stat-metric-box">
               <span className="stat-label">Priority Gaps</span>
-              <span className="stat-number text-amber">{gapCount}</span>
+              <span className="stat-number text-cyan">{gapCount}</span>
               <span className="stat-sub">Targeted in Day 1</span>
             </div>
           </div>
@@ -536,96 +539,107 @@ export default function CandidateProfileView({
           </div>
         </section>
 
-        {/* EVIDENCE PROVENANCE & STRICT AUDIT BREAKDOWN */}
-        <section className="profile-section-card provenance-audit-section">
+        {/* SKILL-BASED STRENGTHS & WEAKNESSES INTELLIGENCE HUB */}
+        <section className="profile-section-card skill-intelligence-hub-section">
           <div className="section-header-row">
             <div>
               <div className="section-pre-badge">
-                <Shield size={13} />
-                <span>RESUME EVIDENCE PROVENANCE AUDIT</span>
+                <Award size={13} />
+                <span>SKILL-BASED CAPABILITY DIAGNOSTICS</span>
               </div>
-              <h2 className="section-title">Certification & Project Verification Breakdown</h2>
+              <h2 className="section-title">Skill-Based Strengths & Weakness Analysis</h2>
               <p className="section-subtitle">
-                Transparent verification of what counted toward your score and what was excluded under strict AI evaluation criteria.
+                Pure skill evaluation extracted directly from your resume text. Highlights your verified technical competencies alongside targeted improvement priorities for workplace simulation.
               </p>
             </div>
           </div>
 
-          <div className="provenance-grid">
-            {/* Box 1: Verified Certifications */}
-            <div className="provenance-box">
-              <div className="prov-header">
-                <GraduationCap size={18} className="text-emerald" />
-                <h4 className="prov-title">Verified Certifications</h4>
-                <span className="prov-count text-emerald">{provenance.verifiedCertifications?.length || 0}</span>
+          <div className="skill-intelligence-grid">
+            {/* Box 1: Demonstrated Skill Strengths */}
+            <div className="skill-intel-box strengths-box">
+              <div className="intel-header">
+                <div className="intel-title-wrap">
+                  <CheckCircle2 size={18} className="text-emerald" />
+                  <h4 className="intel-title">Demonstrated Skill Strengths</h4>
+                </div>
+                <span className="intel-count-badge text-emerald">{skillStrengths.length} Core Strengths</span>
               </div>
-              <p className="prov-desc">Accredited certifications that confer direct capability evidence.</p>
-              {provenance.verifiedCertifications && provenance.verifiedCertifications.length > 0 ? (
-                <ul className="prov-list">
-                  {provenance.verifiedCertifications.map((c, i) => (
-                    <li key={i} className="prov-item verified">
-                      <CheckCircle2 size={13} className="text-emerald" />
-                      <span>{c.name}</span>
-                    </li>
+              <p className="intel-desc">
+                High-proficiency skills where candidate resume indicates prominent technical competency and applied depth.
+              </p>
+              {skillStrengths.length > 0 ? (
+                <div className="intel-items-list">
+                  {skillStrengths.map((item, i) => (
+                    <div key={i} className="intel-item strength">
+                      <div className="intel-item-top">
+                        <div className="flex-row items-center gap-2">
+                          <span className="intel-bullet text-emerald">✦</span>
+                          <strong className="intel-skill-name">{item.skill}</strong>
+                        </div>
+                        <span className="intel-prof-badge text-emerald">{item.proficiency || 85}% Proficiency</span>
+                      </div>
+                      <div className="intel-progress-track">
+                        <div 
+                          className="intel-progress-fill strength" 
+                          style={{ width: `${Math.min(100, Math.max(10, item.proficiency || 85))}%` }} 
+                        />
+                      </div>
+                      {item.strengthRationale && (
+                        <p className="intel-rationale text-muted">
+                          “{item.strengthRationale}”
+                        </p>
+                      )}
+                    </div>
                   ))}
-                </ul>
+                </div>
               ) : (
-                <div className="prov-empty-note">
-                  No accredited industry certifications detected in resume.
+                <div className="intel-empty-note">
+                  No high-depth skills identified. Baseline profile will be established in simulation.
                 </div>
               )}
             </div>
 
-            {/* Box 2: Verified Projects */}
-            <div className="provenance-box">
-              <div className="prov-header">
-                <Briefcase size={18} className="text-cyan" />
-                <h4 className="prov-title">Documented Projects</h4>
-                <span className="prov-count text-cyan">{provenance.documentedProjects?.length || 0}</span>
-              </div>
-              <p className="prov-desc">Projects containing verified architecture & technical info.</p>
-              {provenance.documentedProjects && provenance.documentedProjects.length > 0 ? (
-                <ul className="prov-list">
-                  {provenance.documentedProjects.map((p, i) => (
-                    <li key={i} className="prov-item project">
-                      <FileCode2 size={13} className="text-cyan" />
-                      <div>
-                        <strong>{p.name}</strong>
-                        {p.technologies && <span className="prov-tech-tag"> ({p.technologies.slice(0, 3).join(', ')})</span>}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="prov-empty-note">
-                  No projects with complete technical info found.
+            {/* Box 2: Targeted Skill Weaknesses / Improvement Areas */}
+            <div className="skill-intel-box weaknesses-box">
+              <div className="intel-header">
+                <div className="intel-title-wrap">
+                  <AlertTriangle size={18} className="text-amber" />
+                  <h4 className="intel-title">Targeted Improvement Focus (Skill Deficits)</h4>
                 </div>
-              )}
-            </div>
-
-            {/* Box 3: Unverified Course Claims Discarded */}
-            <div className="provenance-box discard-box">
-              <div className="prov-header">
-                <AlertOctagon size={18} className="text-rose" />
-                <h4 className="prov-title">Courses Without Certification</h4>
-                <span className="prov-count text-rose">0% Value</span>
+                <span className="intel-count-badge text-amber">{skillWeaknesses.length} Focus Areas</span>
               </div>
-              <p className="prov-desc">Per strict evaluation rules, courses without accredited certificates are given zero value.</p>
-              {provenance.unverifiedCourseClaims && provenance.unverifiedCourseClaims.length > 0 ? (
-                <ul className="prov-list">
-                  {provenance.unverifiedCourseClaims.map((u, i) => (
-                    <li key={i} className="prov-item discarded">
-                      <span className="cross-bullet">✕</span>
-                      <div>
-                        <strong>{u.courseName}</strong>
-                        <span className="discard-note"> — {u.reason || 'Lacks official credential'}</span>
+              <p className="intel-desc">
+                Core role competencies with lower resume representation requiring applied validation in workplace simulations.
+              </p>
+              {skillWeaknesses.length > 0 ? (
+                <div className="intel-items-list">
+                  {skillWeaknesses.map((item, i) => (
+                    <div key={i} className="intel-item weakness">
+                      <div className="intel-item-top">
+                        <div className="flex-row items-center gap-2">
+                          <span className="intel-bullet text-amber">▲</span>
+                          <strong className="intel-skill-name">{item.skill}</strong>
+                        </div>
+                        <div className="flex-row items-center gap-1.5">
+                          <span className="intel-priority-pill">{item.priority?.toUpperCase() || 'HIGH'} PRIORITY</span>
+                          <span className="intel-prof-badge text-amber">{item.proficiency || 20}%</span>
+                        </div>
                       </div>
-                    </li>
+                      <div className="intel-progress-track">
+                        <div 
+                          className="intel-progress-fill weakness" 
+                          style={{ width: `${Math.min(100, Math.max(10, item.proficiency || 20))}%` }} 
+                        />
+                      </div>
+                      <p className="intel-rationale text-amber-subtle">
+                        {item.weaknessRationale || item.deficit || 'Essential role capability requiring hands-on demonstration.'}
+                      </p>
+                    </div>
                   ))}
-                </ul>
+                </div>
               ) : (
-                <div className="prov-empty-note text-muted">
-                  No unverified course claims detected.
+                <div className="intel-empty-note">
+                  All role competencies meet initial baseline criteria.
                 </div>
               )}
             </div>
@@ -693,14 +707,14 @@ export default function CandidateProfileView({
                         </div>
                       </td>
                       <td className="cell-provenance">
-                        {g.hasCertification ? (
-                          <span className="prov-basis-badge cert">🎓 Accredited Cert</span>
-                        ) : g.hasProjectInfo ? (
-                          <span className="prov-basis-badge proj">🛠️ Project Evaluated</span>
-                        ) : g.evidenceLevel === 'moderate' || g.evidenceLevel === 'strong' ? (
-                          <span className="prov-basis-badge course">📚 Coursework / Study</span>
+                        {g.candidateEvidencePercent >= 75 ? (
+                          <span className="prov-basis-badge strong">⭐ Primary Competency</span>
+                        ) : g.candidateEvidencePercent >= 50 ? (
+                          <span className="prov-basis-badge mod">📘 Documented Skill</span>
+                        ) : g.candidateEvidencePercent >= 25 ? (
+                          <span className="prov-basis-badge dev">💡 Developing Skill</span>
                         ) : (
-                          <span className="prov-basis-badge none">📋 Skill Profile</span>
+                          <span className="prov-basis-badge none">🎯 Needs Simulation</span>
                         )}
                       </td>
                       <td className="cell-demand">
@@ -713,7 +727,7 @@ export default function CandidateProfileView({
                       </td>
                       <td className="cell-status">
                         <span className={`status-pill ${g.alignmentStatus}`}>
-                          {isAligned ? 'Strong Alignment' : isDevOpp ? 'Development Area' : (isZero ? 'Foundational' : 'Priority Gap')}
+                          {isAligned ? 'Strong Alignment' : isDevOpp ? 'Development Area' : (isZero ? 'Simulation Baseline' : 'Priority Gap')}
                         </span>
                       </td>
                       <td className="cell-actions">

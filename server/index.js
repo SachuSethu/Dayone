@@ -6,7 +6,13 @@ import cors from 'cors';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import { extractResumeText } from './lib/resume/parser.js';
-import { analyzeResume, analyzeSkillGaps, generateMission, evaluateTaskSolution } from './lib/ai/gemini.js';
+import { 
+  analyzeResume, 
+  analyzeSkillGaps, 
+  generateMission, 
+  evaluateTaskSolution,
+  generatePersonalizedJobRecommendation 
+} from './lib/ai/gemini.js';
 
 dotenv.config();
 
@@ -185,6 +191,33 @@ app.post('/api/ai/evaluate-task', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: err.message || 'Task evaluation error.'
+    });
+  }
+});
+
+/**
+ * 6. Generate Personalized Job Recommendation Analysis with Gemini AI
+ */
+app.post('/api/ai/job-recommendation', async (req, res) => {
+  try {
+    const { candidate, job, candidateVector, readinessScore } = req.body;
+    if (!job) {
+      return res.status(400).json({ success: false, error: 'Job details required.' });
+    }
+
+    const recommendation = await generatePersonalizedJobRecommendation({
+      candidate: candidate || {},
+      job,
+      candidateVector: candidateVector || {},
+      readinessScore: readinessScore || 75
+    });
+
+    return res.json({ success: true, data: recommendation });
+  } catch (err) {
+    console.error('[API /api/ai/job-recommendation Error]:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Job recommendation analysis error.'
     });
   }
 });

@@ -74,10 +74,10 @@ export function calculateSkillGaps(candidateSkills = [], roleRequirements = []) 
       isRemarkedInvalid: candidateMatch?.isRemarkedInvalid || false,
       remarkStatus: candidateMatch?.remarkStatus || null,
       validationRemark: candidateMatch?.validationRemark || null,
-      validationMethod: candidateMatch?.validationMethod || (candidateMatch?.hasCertification ? 'Accredited Certification' : candidateMatch?.hasProjectInfo ? 'Project Evidence Evaluated' : 'Invalid / Unverified Certification'),
+      validationMethod: candidateMatch?.validationMethod || 'Resume Skill Profile',
       evidenceLevel: isZero ? 'zero' : evidenceLevel,
-      evidence: candidateMatch?.evidence || (candidateMatch?.validationRemark ? [candidateMatch.validationRemark] : ['No verified project info or accredited certification found in resume (0% value).']),
-      validationStatus: candidateMatch?.validationStatus || (candidateMatch?.isRemarkedInvalid ? 'invalid_until_certified' : 'validated')
+      evidence: candidateMatch?.evidence || (candidateMatch?.validationRemark ? [candidateMatch.validationRemark] : ['Baseline role competency to be evaluated in live workplace simulation.']),
+      validationStatus: candidateMatch?.validationStatus || 'validated'
     };
   });
 
@@ -92,11 +92,11 @@ export function calculateSkillGaps(candidateSkills = [], roleRequirements = []) 
  */
 export function calculateEvidenceHistogram(skillGaps = []) {
   const bins = [
-    { tier: '0% - 20%', range: 'Zero / Unverified', candidateCount: 0, requirementCount: 0, description: 'Missing project info or unverified coursework' },
+    { tier: '0% - 20%', range: 'Baseline / Simulation', candidateCount: 0, requirementCount: 0, description: 'Baseline competency to be validated in simulation' },
     { tier: '21% - 40%', range: 'Limited Evidence', candidateCount: 0, requirementCount: 0, description: 'Basic keyword or introductory mentions' },
-    { tier: '41% - 60%', range: 'Developing', candidateCount: 0, requirementCount: 0, description: 'Moderate implementation across project work' },
-    { tier: '61% - 80%', range: 'Proficient', candidateCount: 0, requirementCount: 0, description: 'Strong multi-project evidence & delivery' },
-    { tier: '81% - 100%', range: 'Certified / Mastered', candidateCount: 0, requirementCount: 0, description: 'Accredited certification or deep production proof' }
+    { tier: '41% - 60%', range: 'Developing', candidateCount: 0, requirementCount: 0, description: 'Moderate presence across technical profile' },
+    { tier: '61% - 80%', range: 'Proficient', candidateCount: 0, requirementCount: 0, description: 'Strong documented skill evidence & depth' },
+    { tier: '81% - 100%', range: 'Mastered / High Depth', candidateCount: 0, requirementCount: 0, description: 'High proficiency documented in resume profile' }
   ];
 
   skillGaps.forEach(g => {
@@ -131,7 +131,7 @@ export function getPriorityAreas(gaps, limit = 3) {
     .map(g => ({
       ...g,
       constructiveReason: g.candidateEvidencePercent === 0
-        ? `${g.skill} is an essential role capability (${g.roleRequirementPercent}%), but has 0% evidence due to missing project descriptions or lack of accredited certifications. DayOne validates this directly in simulation.`
+        ? `${g.skill} is an essential role capability (${g.roleRequirementPercent}%). DayOne validates this directly in practical simulation.`
         : `${g.skill} requires practical demonstration. Role requirement is ${g.roleRequirementPercent}%, whereas your documented resume evidence indicates ${g.candidateEvidencePercent}%.`
     }));
 }
