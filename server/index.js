@@ -6,7 +6,7 @@ import cors from 'cors';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import { extractResumeText } from './lib/resume/parser.js';
-import { analyzeResume, analyzeSkillGaps, generateMission } from './lib/ai/gemini.js';
+import { analyzeResume, analyzeSkillGaps, generateMission, evaluateTaskSolution } from './lib/ai/gemini.js';
 
 dotenv.config();
 
@@ -147,6 +147,44 @@ app.post('/api/ai/generate-mission', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: err.message || 'Mission generation error.'
+    });
+  }
+});
+
+/**
+ * 5. Evaluate Workplace Simulation Task Solution with Gemini AI
+ * Strictly verifies whether the candidate fixed the root cause vs trivial whitespace edit.
+ */
+app.post('/api/ai/evaluate-task', async (req, res) => {
+  try {
+    const {
+      task,
+      initialCode,
+      submittedCode,
+      files,
+      terminalOutput,
+      capturedFlags,
+      elapsedSeconds,
+      hasEdgeCaseFailure
+    } = req.body;
+
+    const evaluation = await evaluateTaskSolution({
+      task: task || {},
+      initialCode: initialCode || '',
+      submittedCode: submittedCode || '',
+      files: files || {},
+      terminalOutput: terminalOutput || '',
+      capturedFlags: capturedFlags || [],
+      elapsedSeconds: elapsedSeconds || 540,
+      hasEdgeCaseFailure: Boolean(hasEdgeCaseFailure)
+    });
+
+    return res.json({ success: true, data: evaluation });
+  } catch (err) {
+    console.error('[API /api/ai/evaluate-task Error]:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Task evaluation error.'
     });
   }
 });

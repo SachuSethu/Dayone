@@ -9,7 +9,7 @@ import { selectAssignedTasksForCandidate } from '../data/taskDatabase';
 import { getLevelInfo, getNextLevel } from '../lib/skills/statsEngine';
 import { 
   Sparkles, Layers, Shield, Award, Terminal, 
-  ChevronRight, RefreshCw, Cpu, LogOut, CheckCircle2
+  ChevronRight, RefreshCw, Cpu, LogOut, CheckCircle2, LayoutDashboard
 } from 'lucide-react';
 
 const STAGES = {
@@ -23,7 +23,8 @@ export default function SimulationEngine({
   currentUser, 
   onLogout, 
   initialMissionData = null, 
-  onSelectNewRole: propOnSelectNewRole = null 
+  onSelectNewRole: propOnSelectNewRole = null,
+  onViewDashboard = null
 }) {
   const [currentStage, setCurrentStage] = useState(
     initialMissionData ? STAGES.WORKSPACE : STAGES.ROLE_SELECT
@@ -238,6 +239,17 @@ export default function SimulationEngine({
             <div className="user-profile-nav">
               <span className="user-avatar-bubble">{currentUser.avatar || '👤'}</span>
               <span className="user-display-name">{currentUser.name}</span>
+              {onViewDashboard && (
+                <button 
+                  type="button"
+                  className="btn btn-secondary btn-xs flex-row items-center gap-1"
+                  onClick={onViewDashboard}
+                  title="Open Candidate Profile Dashboard"
+                >
+                  <LayoutDashboard size={12} className="text-cyan" />
+                  <span>Dashboard</span>
+                </button>
+              )}
               <button 
                 className="btn-logout-nav" 
                 onClick={onLogout}
@@ -279,6 +291,8 @@ export default function SimulationEngine({
             simulationEvents={simulationEvents}
             onTriggerSimEvent={handleTriggerSimEvent}
             onSubmitForEvaluation={handleSubmitEvaluation}
+            currentUser={currentUser}
+            onViewDashboard={onViewDashboard}
           />
         )}
 
@@ -290,6 +304,7 @@ export default function SimulationEngine({
             onSelectNewRole={handleSelectNewRole}
             onProceedToNextTask={handleProceedToNextTask}
             onAdvanceToNextLevel={handleAdvanceToNextLevel}
+            onViewDashboard={onViewDashboard}
             taskIndex={taskIndex}
             totalTasksInLevel={assignedTasks.length > 0 ? assignedTasks.length : 2}
             currentLevel={currentLevel}

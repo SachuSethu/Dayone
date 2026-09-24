@@ -16,7 +16,14 @@ const ICON_MAP = {
   'data-analyst': BarChart2
 };
 
-export default function TargetRoleSelector({ onSelectRole, currentUser, onLogout }) {
+export default function TargetRoleSelector({ 
+  onSelectRole, 
+  currentUser, 
+  onLogout, 
+  savedResume = null,
+  onUploadNewResume = null,
+  onOpenDashboard = null
+}) {
   const [selectedRoleId, setSelectedRoleId] = useState('frontend-developer');
 
   const handleConfirm = (role) => {
@@ -60,10 +67,16 @@ export default function TargetRoleSelector({ onSelectRole, currentUser, onLogout
 
         <div className="user-nav-actions">
           {currentUser && (
-            <div className="current-user-pill">
+            <button 
+              type="button"
+              className="current-user-pill clickable"
+              onClick={onOpenDashboard}
+              title="Click to open your Candidate Account Dashboard"
+            >
               <span className="user-icon">{currentUser.avatar || '👤'}</span>
               <span className="user-name">{currentUser.name || currentUser.email}</span>
-            </div>
+              <span className="user-dash-tag">Account Dashboard</span>
+            </button>
           )}
           {onLogout && (
             <button className="btn-signout-subtle" onClick={onLogout} title="Sign Out">
@@ -79,7 +92,7 @@ export default function TargetRoleSelector({ onSelectRole, currentUser, onLogout
         <div className="target-role-hero">
           <div className="hero-badge">
             <Sparkles size={14} className="sparkle-icon" />
-            <span>STEP 1 OF 3 • CAREER BENCHMARKING</span>
+            <span>CAREER BENCHMARKING & TARGET SELECTION</span>
           </div>
           <h1 className="hero-title">Select Your Target Role</h1>
           <p className="hero-description">
@@ -87,6 +100,34 @@ export default function TargetRoleSelector({ onSelectRole, currentUser, onLogout
             will extract your verified resume evidence, benchmark against production requirements, 
             and generate a personalized first-day workplace scenario.
           </p>
+
+          {/* Saved Resume Active Banner */}
+          {savedResume && (
+            <div className="saved-resume-role-banner animate-slide-in">
+              <div className="flex-row items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald" />
+                <span className="text-white font-medium text-xs">
+                  Saved Resume: <strong className="text-cyan font-mono">{savedResume.fileName}</strong>
+                </span>
+                <span className="dot-sep text-muted">•</span>
+                <span className="text-muted text-xs">
+                  Your resume is saved. Selecting a role will automatically evaluate it without re-uploading.
+                </span>
+              </div>
+              {onUploadNewResume && (
+                <button 
+                  type="button" 
+                  className="btn-link-upload-diff"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUploadNewResume();
+                  }}
+                >
+                  (Upload Different Resume)
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Role Cards Grid */}
@@ -149,7 +190,11 @@ export default function TargetRoleSelector({ onSelectRole, currentUser, onLogout
                       handleConfirm(role);
                     }}
                   >
-                    <span>{isSelected ? 'Continue with This Role' : 'Select Role'}</span>
+                    <span>
+                      {savedResume 
+                        ? (isSelected ? 'Analyze with Saved Resume' : 'Switch & Analyze') 
+                        : (isSelected ? 'Continue with This Role' : 'Select Role')}
+                    </span>
                     <ArrowRight size={15} />
                   </button>
                 </div>
@@ -170,7 +215,7 @@ export default function TargetRoleSelector({ onSelectRole, currentUser, onLogout
             className="btn-dock-confirm"
             onClick={() => handleConfirm(selectedRole)}
           >
-            <span>Proceed to Resume Intelligence</span>
+            <span>{savedResume ? `Analyze ${selectedRole.name} with Saved Resume` : 'Proceed to Resume Intelligence'}</span>
             <ArrowRight size={16} />
           </button>
         </div>

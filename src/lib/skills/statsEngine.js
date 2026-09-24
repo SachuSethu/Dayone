@@ -92,18 +92,34 @@ export function calculateTaskEvaluation({
   elapsedSeconds = 540,
   candidateLevel = 2,
   hintsUsed = 0,
-  chaosResolved = true
+  chaosResolved = true,
+  aiEvaluation = null
 }) {
   const levelInfo = getLevelInfo(candidateLevel);
   const targetMinutes = missionData?.estimatedDurationMinutes || levelInfo.targetMinutes || 20;
 
-  // Check technical success
-  const isPatched = Boolean(
+  // 1. Strict diff validation: Check if submitted code is identical to initial code or only whitespace
+  const normInitial = (workspaceState?.initialCode || '').replace(/\s+/g, '');
+  const normSubmitted = (workspaceState?.submittedCode || '').replace(/\s+/g, '');
+  const isWhitespaceOnly = Boolean(normInitial && normSubmitted && normInitial === normSubmitted);
+
+  // 2. Base patched detection
+  let isPatched = Boolean(
     workspaceState?.feCodePatched || 
     workspaceState?.threatContained || 
     workspaceState?.activeLayoutVariant === 'variant_b' ||
     workspaceState?.testsPassed
   );
+
+  // Trivial/whitespace edits never count as patched
+  if (isWhitespaceOnly) {
+    isPatched = false;
+  }
+
+  // Gemini AI Evaluation acts as the supreme ground truth
+  if (aiEvaluation) {
+    isPatched = Boolean(aiEvaluation.isBugFixed);
+  }
 
   const testsPassed = Boolean(workspaceState?.testsPassed || (isPatched && !workspaceState?.hasEdgeCaseFailure));
   const hasEdgeCaseFailure = Boolean(workspaceState?.hasEdgeCaseFailure);
@@ -116,34 +132,68 @@ export function calculateTaskEvaluation({
     isAccurate: isPatched && !hasEdgeCaseFailure
   });
 
+  // Capture Flag Checkpoint Metrics (10 flags per task)
+  const capturedFlags = workspaceState?.capturedFlags || [];
+  const capturedCount = capturedFlags.length > 0 
+    ? capturedFlags.length 
+    : (isPatched ? 8 : 4);
+  const totalFlagsCount = workspaceState?.totalFlagsCount || 10;
+  const flagScore = workspaceState?.flagScore ?? (capturedCount * 10);
+  const flagPercentage = Math.round((capturedCount / totalFlagsCount) * 100);
+
   // Technical Review Scores (Step 12)
-  const codeCorrectness = Math.round((isPatched ? 91 : 45) * (hasEdgeCaseFailure ? 0.78 : 1.0));
-  const edgeCases = hasEdgeCaseFailure ? 58 : Math.round(78 * (testsPassed ? 1.15 : 0.85));
-  const architecture = Math.round(84 * (workspaceState?.gitCommitted ? 1.05 : 0.95));
-  const debugging = Math.round(94 * timePerf.speedMultiplier);
+  let codeCorrectness = isPatched ? 91 : (isWhitespaceOnly ? 18 : 45);
+  let edgeCases = hasEdgeCaseFailure ? 58 : Math.round(78 * (testsPassed ? 1.15 : 0.85));
+  let architecture = Math.round(84 * (workspaceState?.gitCommitted ? 1.05 : 0.95));
+  let debugging = Math.round((70 + (flagPercentage * 0.3)) * timePerf.speedMultiplier);
 
   // Workplace Review Scores (Step 12)
-  const communication = Math.round((workspaceState?.gitCommitted ? 88 : 72) * (chaosResolved ? 1.08 : 0.9));
-  const problemSolving = Math.round(91 * timePerf.speedMultiplier);
-  const prioritization = chaosResolved ? 86 : 74;
-  const coachability = Math.max(80, 96 - hintsUsed * 2);
+  let communication = Math.round((workspaceState?.gitCommitted ? 88 : 72) * (chaosResolved ? 1.08 : 0.9));
+  let problemSolving = Math.round((isPatched ? 75 : 30) + (flagPercentage * 0.25)) * timePerf.speedMultiplier;
+  let prioritization = chaosResolved ? 86 : 74;
+  let coachability = Math.max(80, 96 - hintsUsed * 2);
+
+  // Overlay Gemini AI Scores if available
+  if (aiEvaluation) {
+    if (aiEvaluation.codeCorrectnessScore !== undefined) codeCorrectness = aiEvaluation.codeCorrectnessScore;
+    if (aiEvaluation.edgeCasesScore !== undefined) edgeCases = aiEvaluation.edgeCasesScore;
+    if (aiEvaluation.architectureScore !== undefined) architecture = aiEvaluation.architectureScore;
+    if (aiEvaluation.debuggingScore !== undefined) debugging = aiEvaluation.debuggingScore;
+    if (aiEvaluation.workplaceReview) {
+      if (aiEvaluation.workplaceReview.communication) communication = aiEvaluation.workplaceReview.communication;
+      if (aiEvaluation.workplaceReview.problemSolving) problemSolving = aiEvaluation.workplaceReview.problemSolving;
+      if (aiEvaluation.workplaceReview.prioritization) prioritization = aiEvaluation.workplaceReview.prioritization;
+      if (aiEvaluation.workplaceReview.coachability) coachability = aiEvaluation.workplaceReview.coachability;
+    }
+  }
 
   const technicalAverage = Math.round((codeCorrectness + edgeCases + architecture + debugging) / 4);
   const workplaceAverage = Math.round((communication + problemSolving + prioritization + coachability) / 4);
 
-  // Combined Job Readiness Score
-  const rawScore = Math.round((technicalAverage * 0.6) + (workplaceAverage * 0.4));
-  const totalScore = Math.min(99, Math.max(35, rawScore));
+  // Job Readiness Score
+  let rawScore = Math.round((technicalAverage * 0.45) + (workplaceAverage * 0.35) + (flagPercentage * 0.20));
+  let totalScore = Math.min(99, Math.max(24, rawScore));
 
-  const passed = totalScore >= levelInfo.minCreditToPass && !hasEdgeCaseFailure;
+  if (aiEvaluation?.totalReadinessScore !== undefined) {
+    totalScore = aiEvaluation.totalReadinessScore;
+  } else if (isWhitespaceOnly) {
+    totalScore = 24;
+  }
+
+  // Pass condition: Requires bug fixed AND totalScore >= min credit AND no unresolved edge case
+  const passed = isPatched && totalScore >= levelInfo.minCreditToPass && !hasEdgeCaseFailure;
 
   // Calculate Statistical Skill Improvements
+  // STRICT RULE: If bug is not fixed, statistical improvement gain is 0%!
   const skillGaps = missionData?.skillGaps || [];
   const skillImprovements = skillGaps.slice(0, 5).map(gap => {
     const before = Number(gap.candidateEvidencePercent || gap.candidateScore || 50);
-    // Base gain modified by speed multiplier
-    const baseGain = isPatched ? 22 : 8;
-    const gain = Math.round(baseGain * timePerf.speedMultiplier);
+    let gain = 0;
+    if (isPatched && !isWhitespaceOnly) {
+      const baseGain = aiEvaluation?.statisticalImprovementGain || 20;
+      const flagBonus = Math.round((flagPercentage / 100) * 4);
+      gain = Math.round((baseGain + flagBonus) * timePerf.speedMultiplier);
+    }
     const after = Math.min(95, before + gain);
     return {
       skill: gap.skill || gap.name,
@@ -163,7 +213,17 @@ export function calculateTaskEvaluation({
     totalScore,
     levelInfo,
     passed,
+    isPatched,
+    isWhitespaceOnly,
+    aiEvaluation,
     hasEdgeCaseFailure,
+    flagMetrics: {
+      capturedCount,
+      totalFlagsCount,
+      flagScore,
+      flagPercentage,
+      passedAllFlags: capturedCount >= totalFlagsCount
+    },
     edgeCaseDetails: hasEdgeCaseFailure ? {
       skill: 'API Error Handling',
       description: 'Your solution works for the primary case, but fails when the API returns an empty payment response.',
@@ -188,13 +248,16 @@ export function calculateTaskEvaluation({
     timePerformance: timePerf,
     skillImprovements,
     credentialId,
-    demonstratedCapabilities: [
+    demonstratedCapabilities: isPatched ? [
       `${missionData?.role?.name || 'Core'} Debugging`,
       'State Management & Lifecycle',
       'API Integration & Error Handling',
       'Edge-Case Verification',
       'Git Workflow & PR Hygiene',
       'Production Triage & Prioritization'
+    ] : [
+      'Initial Code Inspection',
+      'Workspace Telemetry Navigation'
     ]
   };
 }

@@ -13,7 +13,9 @@ export default function ResumeUploader({
   targetRole, 
   onBack, 
   onSubmitResume, 
-  currentUser 
+  currentUser,
+  savedResume = null,
+  onOpenDashboard = null
 }) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -181,7 +183,19 @@ export default function ResumeUploader({
           </div>
         </div>
 
-        <div className="user-nav-actions">
+        <div className="user-nav-actions flex-row items-center gap-2">
+          {currentUser && onOpenDashboard && (
+            <button 
+              type="button"
+              className="current-user-pill clickable"
+              onClick={onOpenDashboard}
+              title="Click to open your Candidate Account Dashboard"
+            >
+              <span className="user-icon">{currentUser.avatar || '👤'}</span>
+              <span className="user-name">{currentUser.name || currentUser.email}</span>
+              <span className="user-dash-tag">Dashboard</span>
+            </button>
+          )}
           <span className="mandatory-badge">
             <Lock size={12} />
             <span>Non-Skippable Step</span>
@@ -205,16 +219,45 @@ export default function ResumeUploader({
 
         <div className="uploader-hero">
           <div className="hero-badge required-badge">
-            <AlertCircle size={14} className="alert-badge-icon" />
-            <span>MANDATORY STEP • RESUME INTELLIGENCE</span>
+            <Sparkles size={14} className="alert-badge-icon" />
+            <span>RESUME INTELLIGENCE & SKILL AUDIT</span>
           </div>
           <h1 className="hero-title">Submit Candidate Resume</h1>
           <p className="hero-description">
-            DayOne’s AI Evaluation Engine extracts real project evidence, audits accredited certifications, 
-            benchmarks demonstrated competencies against <strong>{targetRole?.name}</strong> production requirements, 
+            DayOne’s AI Evaluation Engine extracts skill evidence from your coursework, projects, and work background, 
+            benchmarks competencies against <strong>{targetRole?.name}</strong> production requirements, 
             and generates your customized first-day workplace mission.
           </p>
         </div>
+
+        {/* Saved Resume Shortcut Banner */}
+        {savedResume && (
+          <div className="saved-resume-banner animate-slide-in">
+            <div className="flex-row items-center gap-3">
+              <div className="saved-resume-icon-circle">
+                <FileCheck size={22} className="text-emerald" />
+              </div>
+              <div>
+                <div className="flex-row items-center gap-2">
+                  <span className="font-bold text-white text-sm">Saved Resume Ready:</span>
+                  <span className="font-mono text-cyan text-xs font-semibold">{savedResume.fileName}</span>
+                </div>
+                <p className="text-xs text-muted mb-0 mt-0.5">
+                  Your resume is already loaded. You can click below to evaluate it for <strong>{targetRole?.name}</strong>, or upload a new file below.
+                </p>
+              </div>
+            </div>
+            <button 
+              type="button" 
+              className="btn btn-primary btn-sm btn-use-saved-resume"
+              disabled={isProcessing}
+              onClick={() => onSubmitResume({ type: 'text', text: savedResume.text, fileName: savedResume.fileName })}
+            >
+              <span>Analyze with Saved Resume</span>
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Tab mode toggle: Upload File vs Sample Demo vs Paste */}
         <div className="input-mode-tabs">

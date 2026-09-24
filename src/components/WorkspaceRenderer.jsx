@@ -7,8 +7,10 @@ import {
   MessageSquare, CheckSquare, Code, Terminal, Globe, 
   GitBranch, Bot, AlertTriangle, FileSearch, Activity, 
   Shield, Compass, Layers, SmilePlus, BookOpen, Kanban,
-  Clock, ShieldAlert, Award, ArrowRight, Zap, Bell, CheckCircle2
+  Clock, ShieldAlert, Award, ArrowRight, Zap, Bell, CheckCircle2, Flag
 } from 'lucide-react';
+
+import CaptureFlagsPanel from './CaptureFlagsPanel';
 
 // Tool Components
 import SlackTool from './tools/SlackTool';
@@ -84,7 +86,9 @@ export default function WorkspaceRenderer({
   missionData, 
   simulationEvents = [],
   onTriggerSimEvent,
-  onSubmitForEvaluation 
+  onSubmitForEvaluation,
+  currentUser = null,
+  onViewDashboard = null
 }) {
   const { role, tools, estimatedDurationMinutes } = missionData;
 
@@ -94,6 +98,30 @@ export default function WorkspaceRenderer({
     return tools[0]?.id || 'slack';
   });
 
+  const defaultInitialCode = (missionData?.assignedTask?.initialFiles && Object.values(missionData.assignedTask.initialFiles)[0]) || 
+`// CRITICAL BUG: Unhandled rejected promises on 500/504
+export async function submitCheckout(payload, maxRetries = 0) {
+  // Missing timeout and retry logic
+  const response = await fetch('/api/v2/checkout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  // BUG: Not checking response.ok properly
+  const data = await response.json();
+  return data;
+}
+
+export function calculateCartTotal(items, discountCode) {
+  // BUG: Floating point precision error and missing null check
+  let sum = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  if (discountCode === 'DAYONE20') {
+    sum = sum * 0.8; // vulnerable to 0.79999999999
+  }
+  return sum;
+}`;
+
   // State maintained across tools during simulation
   const [workspaceState, setWorkspaceState] = useState({
     // Frontend state
@@ -101,6 +129,9 @@ export default function WorkspaceRenderer({
     testsPassed: false,
     gitCommitted: false,
     jiraStatus: 'In Progress',
+    initialCode: defaultInitialCode,
+    submittedCode: defaultInitialCode,
+    fileContents: null,
     // Cybersecurity state
     threatContained: false,
     quarantinedIps: [],
@@ -136,6 +167,64 @@ export default function WorkspaceRenderer({
 
   // Edge case toggle for Step 13 demonstration
   const [hasEdgeCaseFailure, setHasEdgeCaseFailure] = useState(false);
+
+  // Capture Flags Checkpoints State (10 Flags per Task, 5 per Subtask)
+  const [showFlagsPanel, setShowFlagsPanel] = useState(false);
+  const [capturedFlagIds, setCapturedFlagIds] = useState(() => {
+    return workspaceState?.capturedFlags || [];
+  });
+
+  const allTaskFlags = (missionData.subtasks || []).flatMap(st => st.flags || []);
+
+  const handleCaptureFlag = (flagId, points) => {
+    setCapturedFlagIds(prev => {
+      if (prev.includes(flagId)) return prev;
+      return [...prev, flagId];
+    });
+    setWorkSignals(prev => ({
+      ...prev,
+      investigatedCode: true,
+      testedHypothesis: true,
+      identifiedDependency: true
+    }));
+  };
+
+  // Real-time auto-unlock when workspace actions occur
+  useEffect(() => {
+    if (workspaceState.feCodePatched) {
+      const implFlag = allTaskFlags.find(f => f.type === 'implementation' || f.action?.includes('Modify code'));
+      if (implFlag && !capturedFlagIds.includes(implFlag.id)) {
+        setCapturedFlagIds(prev => [...prev, implFlag.id]);
+      }
+    }
+  }, [workspaceState.feCodePatched, allTaskFlags]);
+
+  useEffect(() => {
+    if (workspaceState.testsPassed) {
+      const verifyFlag = allTaskFlags.find(f => f.type === 'verification' || f.type === 'testing' || f.action?.includes('test'));
+      if (verifyFlag && !capturedFlagIds.includes(verifyFlag.id)) {
+        setCapturedFlagIds(prev => [...prev, verifyFlag.id]);
+      }
+    }
+  }, [workspaceState.testsPassed, allTaskFlags]);
+
+  useEffect(() => {
+    if (workspaceState.gitCommitted) {
+      const finalFlag = allTaskFlags.find(f => f.type === 'final_evidence' || f.action?.includes('evidence'));
+      if (finalFlag && !capturedFlagIds.includes(finalFlag.id)) {
+        setCapturedFlagIds(prev => [...prev, finalFlag.id]);
+      }
+    }
+  }, [workspaceState.gitCommitted, allTaskFlags]);
+
+  useEffect(() => {
+    if (workspaceState.threatContained) {
+      const contFlag = allTaskFlags.find(f => f.type === 'containment' || f.action?.includes('containment'));
+      if (contFlag && !capturedFlagIds.includes(contFlag.id)) {
+        setCapturedFlagIds(prev => [...prev, contFlag.id]);
+      }
+    }
+  }, [workspaceState.threatContained, allTaskFlags]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -173,11 +262,13 @@ export default function WorkspaceRenderer({
   }, [simulationEvents]);
 
   // Handlers for state updates from tools
-  const handleFeCodeUpdate = (isPatched) => {
+  const handleFeCodeUpdate = (isPatched, updatedFiles) => {
     setWorkSignals(prev => ({ ...prev, investigatedCode: true, testedHypothesis: true }));
     setWorkspaceState(prev => ({
       ...prev,
       feCodePatched: isPatched,
+      fileContents: updatedFiles || prev.fileContents,
+      submittedCode: updatedFiles ? (updatedFiles['src/services/checkoutApi.js'] || Object.values(updatedFiles)[0]) : prev.submittedCode,
       actionsCount: prev.actionsCount + 1
     }));
   };
@@ -260,12 +351,23 @@ export default function WorkspaceRenderer({
           </div>
         </div>
 
-        {/* Center: Mission Timer & Event Trigger */}
+        {/* Center: Mission Timer, Event Trigger & Capture Flags HUD */}
         <div className="workspace-timer-box">
           <div className="timer-badge">
             <Clock size={15} className="text-warning" />
             <span className="timer-digits font-mono">{formatTime(secondsRemaining)}</span>
           </div>
+
+          <button 
+            type="button"
+            className={`btn-flags-hud ${capturedFlagIds.length === (allTaskFlags.length || 10) ? 'completed' : ''}`}
+            onClick={() => setShowFlagsPanel(true)}
+            title="Inspect Capture-Flag Checkpoints for this task"
+          >
+            <Flag size={14} className={capturedFlagIds.length === (allTaskFlags.length || 10) ? 'text-emerald' : 'text-amber'} />
+            <span>Flags: <strong>{capturedFlagIds.length}/{allTaskFlags.length || 10}</strong></span>
+            <span className="flags-score-badge font-mono">{capturedFlagIds.length * 10} pts</span>
+          </button>
 
           <button 
             className="btn btn-secondary btn-xs btn-event-sim"
@@ -277,16 +379,36 @@ export default function WorkspaceRenderer({
           </button>
         </div>
 
-        {/* Right: Submit Button */}
-        <div className="workspace-submit-action">
+        {/* Right: Submit Button & User Dashboard Access */}
+        <div className="workspace-submit-action flex-row items-center gap-2">
+          {currentUser && onViewDashboard && (
+            <button 
+              type="button"
+              className="current-user-pill clickable workspace-user-pill"
+              onClick={onViewDashboard}
+              title="Click to view your Candidate Account Dashboard"
+            >
+              <span className="user-icon">{currentUser.avatar || '👤'}</span>
+              <span className="user-name">{currentUser.name || 'Candidate'}</span>
+              <span className="user-dash-tag">Dashboard</span>
+            </button>
+          )}
+
           <button 
             className={`btn btn-submit-evaluation ${isReadyForSubmission() ? 'btn-ready' : ''}`}
             onClick={() => onSubmitForEvaluation({
               ...workspaceState,
+              initialCode: workspaceState.initialCode || defaultInitialCode,
+              submittedCode: workspaceState.submittedCode || defaultInitialCode,
+              files: workspaceState.fileContents,
               elapsedSeconds,
               workSignals,
               chaosResolved: chaosEvent.resolved,
-              hasEdgeCaseFailure
+              hasEdgeCaseFailure,
+              capturedFlags: capturedFlagIds,
+              flagScore: capturedFlagIds.length * 10,
+              totalFlagsCount: allTaskFlags.length || 10,
+              flagPercentage: Math.round((capturedFlagIds.length / (allTaskFlags.length || 10)) * 100)
             })}
           >
             <Award size={16} />
@@ -323,13 +445,13 @@ export default function WorkspaceRenderer({
           </span>
         </div>
         <div className="edge-case-demo-toggle">
-          <label title="Toggle edge case discovery for Step 13 / 14 Skill Sprint flow">
+          <label title="Toggle edge case discovery for Skill Sprint flow">
             <input 
               type="checkbox" 
               checked={hasEdgeCaseFailure}
               onChange={(e) => setHasEdgeCaseFailure(e.target.checked)}
             />
-            <span>Test Edge Case (Step 13 Sprint)</span>
+            <span>Simulate Production Edge Case</span>
           </label>
         </div>
       </div>
@@ -399,14 +521,14 @@ export default function WorkspaceRenderer({
         )}
       </div>
 
-      {/* STEP 10: CHAOS EVENT MODAL */}
+      {/* CHAOS EVENT MODAL */}
       {chaosEvent.active && (
         <div className="chaos-modal-backdrop">
           <div className="chaos-modal-card animate-scale-in">
             <div className="chaos-modal-header">
               <div className="chaos-badge">
                 <AlertTriangle size={14} className="text-amber" />
-                <span>STEP 10 — 💥 CHAOS EVENT</span>
+                <span>💥 SPRINT DISRUPTION — CHAOS EVENT</span>
               </div>
               <h3 className="chaos-title">Unexpected Sprint Disruption</h3>
               <p className="chaos-subtitle">DayOne measures real workplace behaviour under sudden scope changes.</p>
@@ -494,6 +616,16 @@ export default function WorkspaceRenderer({
           </div>
         </div>
       )}
+
+      {/* Capture Flags Checkpoints Drawer */}
+      <CaptureFlagsPanel 
+        subtasks={missionData.subtasks || []}
+        capturedFlagIds={capturedFlagIds}
+        onCaptureFlag={handleCaptureFlag}
+        onSelectTool={setActiveToolId}
+        isOpen={showFlagsPanel}
+        onClose={() => setShowFlagsPanel(false)}
+      />
     </div>
   );
 }

@@ -372,7 +372,7 @@ export async function processPaymentResponse(res) {
                 {challengeSubmitted && challengeAnswer === 'A' && (
                   <button className="btn-sprint-finish" onClick={handleFinish}>
                     <RotateCcw size={16} />
-                    <span>Try the Shift Again (Step 15)</span>
+                    <span>Try the Shift Again</span>
                   </button>
                 )}
               </div>

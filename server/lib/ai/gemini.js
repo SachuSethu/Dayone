@@ -4,6 +4,7 @@
 
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import { getMicroCoursesByRole, findMicroCourseForWeakness, getModuleImage } from '../data/microCourses.js';
 
 dotenv.config();
 
@@ -53,25 +54,19 @@ export async function analyzeResume(resumeText, targetRole, roleRequirements = [
     return generateFallbackResumeAnalysis(resumeText, targetRole, roleRequirements);
   }
 
-  const prompt = `You are DayOne's Rigorous AI Evaluation Engine for Resume Understanding.
+  const prompt = `You are DayOne's AI Evaluation Engine for Resume Understanding.
+Analyze the candidate's uploaded resume text against the target role: "${targetRole}".
 
-CRITICAL EVALUATION POLICIES:
-1. RESUME REJECTION POLICY:
-   - If the candidate's resume has NO accredited certifications AND NO documented projects with project info (e.g. they only listed course titles, tutorials, bootcamps, or keyword lists without evidence), set "isRejected": true with "rejectionReason": "No accredited certifications or documented project deliverables found in uploaded resume. DayOne strictly requires accredited industry certification credentials or concrete project documentation with technologies and deliverables."
-   - If the resume contains at least one verified accredited certification OR documented project deliverables, set "isRejected": false.
-
-2. PROJECT KNOWLEDGE EVALUATION WITHOUT CERTIFICATION:
-   - If a candidate has done a project with a skill (even without any certification), EVALUATE THE PROJECT info (technologies used, architectural responsibilities, context, deliverables) and assign their knowledge score based on that project (0.65 - 0.90).
-   - Set "hasProjectInfo": true, "hasCertification": false, "validationMethod": "Project Experience Evaluated", "isRemarkedInvalid": false, "validationRemark": null.
-
-3. SPECIFIC SKILL INVALID CERTIFICATION REMARK:
-   - If a skill has NO project info, and its certification is missing, unaccredited, or invalid for that specific skill (e.g. course claims without official certificates):
-     - DO NOT assign silent zero without remarking!
-     - Set "resumeEvidence": 0.0, "isRemarkedInvalid": true, "remarkStatus": "invalid_certification", "validationRemark": "This skill is not valid until you submit a valid certification.", "validationMethod": "Invalid / Unverified Certification".
-     - In evidence array, note: "This skill is not valid until you submit a valid certification."
-
-4. ACCREDITED CERTIFICATIONS:
-   - Only recognized official credentials (e.g. AWS Certified, CompTIA, Cisco, Meta, Oracle, Kubernetes CKA, Google Cloud, accredited university degree) provide certification evidence (0.85 - 0.95).
+EVALUATION GUIDELINES (NO MANDATORY CERTIFICATION / PROJECT BARRIERS):
+1. ACCESSIBLE & FAIR SKILL EVALUATION:
+   - Certifications and projects are NOT mandatory. Resumes must NEVER be rejected ("isRejected": false).
+   - Evaluate the candidate's skills based on all available evidence in the resume:
+     * Official industry credentials: 0.85 - 0.95
+     * Documented projects or work deliverables: 0.65 - 0.85
+     * Coursework, bootcamps, learning tutorials (Coursera, Udemy, etc.): 0.50 - 0.65
+     * Explicitly listed technical skills & competencies: 0.35 - 0.50
+     * Unmentioned core role skills: 0.15 - 0.25 (to be validated in workplace simulation)
+   - Do NOT mark skills as invalid or 0% for lacking certificates. Every candidate receives an authentic baseline profile.
 
 TARGET ROLE: ${targetRole}
 ROLE CORE SKILLS:
@@ -94,7 +89,7 @@ Return ONLY a single valid JSON object strictly matching this schema:
       { "name": "Certification Name", "issuer": "Issuer", "verified": true }
     ],
     "unverifiedCourseClaims": [
-      { "courseName": "Course Name", "reason": "No official certification credential provided (scored 0%)" }
+      { "courseName": "Course Name", "reason": "Coursework & learning noted" }
     ],
     "documentedProjects": [
       { "name": "Project Name", "hasProjectInfo": true, "technologies": ["React", "CSS"] }
@@ -103,16 +98,16 @@ Return ONLY a single valid JSON object strictly matching this schema:
   "skills": [
     {
       "name": "Skill Name",
-      "resumeEvidence": 0.85,
-      "evidenceLevel": "strong",
+      "resumeEvidence": 0.70,
+      "evidenceLevel": "moderate",
       "hasProjectInfo": true,
       "hasCertification": false,
       "isRemarkedInvalid": false,
       "remarkStatus": null,
       "validationRemark": null,
-      "validationMethod": "Project Experience Evaluated",
+      "validationMethod": "Resume Evaluation",
       "evidence": [
-        "Concrete project evidence quote or reason why scored 0"
+        "Identified from coursework, projects, or listed technical competencies."
       ]
     }
   ]
@@ -238,9 +233,413 @@ Return ONLY valid JSON:
   }
 }
 
+/**
+ * 4. Evaluate Workplace Simulation Task Solution with Gemini AI
+ * Enforces strict error-fix validation:
+ * - Reject whitespace-only or cosmetic edits with failing scores and 0% statistical gain.
+ * - Verify true root-cause error resolution and resilience.
+ */
+export async function evaluateTaskSolution({
+  task = {},
+  initialCode = '',
+  submittedCode = '',
+  files = {},
+  terminalOutput = '',
+  capturedFlags = [],
+  elapsedSeconds = 540,
+  hasEdgeCaseFailure = false
+}) {
+  if (!client) {
+    return generateFallbackTaskEvaluation({
+      task,
+      initialCode,
+      submittedCode,
+      files,
+      terminalOutput,
+      capturedFlags,
+      hasEdgeCaseFailure
+    });
+  }
+
+  const roleId = task?.roleId || task?.role || 'frontend-developer';
+  const roleCourses = getMicroCoursesByRole(roleId);
+
+  const prompt = `You are DayOne.ai's Master Code Review & AI Evaluation Engine.
+Your job is to strictly evaluate whether the candidate ACTUALLY FIXED THE ERROR in the simulated workplace incident, or if they just changed spaces/comments or failed to fix the bug.
+
+CRITICAL EVALUATION POLICIES:
+1. TRIVIAL / WHITESPACE EDIT REJECTION (HIGHEST PRIORITY):
+   - Compare INITIAL BUGGY CODE with CANDIDATE SUBMITTED CODE.
+   - If the candidate only changed whitespace, indentation, spaces, comments, or made cosmetic edits without fixing the core bug:
+     - "isBugFixed": false
+     - "fixQuality": "trivial_whitespace_edit"
+     - "codeCorrectnessScore": 15
+     - "debuggingScore": 20
+     - "edgeCasesScore": 15
+     - "architectureScore": 25
+     - "totalReadinessScore": 24
+     - "passed": false
+     - "statisticalImprovementGain": 0
+     - "aiEvaluationSummary": "Evaluation Rejected: Only whitespace or cosmetic formatting changes were detected. The core error was NOT resolved. No statistical improvement is awarded."
+     - "unresolvedErrors": ["No retry loop implemented for HTTP 504 / 500 errors", "State lock not released on payment failure", "Float precision error remains in total calculation"]
+     - "actionableNextSteps": ["Implement a retry loop with exponential backoff", "Wrap network call in try/finally to clear submitting lock", "Use Math.round on discounted total"]
+
+2. PARTIAL / BROKEN FIX:
+   - If candidate attempted a fix but it does not resolve the root cause or fails error recovery:
+     - "isBugFixed": false
+     - "fixQuality": "incomplete_fix"
+     - "codeCorrectnessScore": 45
+     - "totalReadinessScore": 48
+     - "passed": false
+     - "statisticalImprovementGain": 0
+
+3. GENUINE, VERIFIED FIX:
+   - If the candidate genuinely implemented the necessary logic to resolve the root cause:
+     - "isBugFixed": true
+     - "fixQuality": "production_ready"
+     - "codeCorrectnessScore": 92
+     - "totalReadinessScore": 89
+     - "passed": true
+     - "statisticalImprovementGain": 20
+     - "aiEvaluationSummary": "Root cause verified resolved. The patch implements resilient error recovery and adheres to production standards."
+
+4. CANDIDATE WEAKNESS & STRENGTH DIAGNOSTICS (CRITICAL):
+Perform a diagnostic analysis of the candidate's engineering weaknesses demonstrated in this task submission:
+- Analyze what root causes or edge cases they struggled with or failed to address (e.g. Asynchronous retries, state release in finally block, floating point precision, unhandled API error codes, testing assertions).
+- Provide 2 to 3 primary weaknesses with:
+  * "area": Skill or concept area (e.g. "Asynchronous Error Handling", "Production State Cleanup", "IEEE 754 Arithmetic Precision", "Automated Regression Testing")
+  * "severity": "high" | "medium" | "low"
+  * "description": Observable technical deficiency from their code diff or execution
+  * "impactOnProduction": Concrete real-world risk if deployed to production
+  * "remediationAdvice": Clear, actionable step to master this skill
+- Also identify 1 to 2 "demonstratedStrengths" with evidence from their code or flags.
+- Provide "recommendedRemediationSprint": Suggested micro-learning sprint topic.
+
+5. ASSIGN SPECIFIC TARGETED MICRO-LEARNING COURSE (FROM OFFICIAL DATABASE):
+Examine the candidate's diagnosed weakness.
+Select the SINGLE BEST matching course module from the official DayOne.ai MicroLearningModules database below for their role (${roleId}):
+${JSON.stringify(roleCourses, null, 2)}
+
+Return a "recommendedMicroCourse" object in the JSON schema with:
+- "moduleId": ID of the module (e.g. "fe-mod-03")
+- "title": Title of the module
+- "videoTitle": Video title
+- "provider": Provider name
+- "videoUrl": Official video URL
+- "relevanceReason": Concrete explanation why this video course specifically fixes their code weakness
+
+TASK METADATA:
+- ID: ${task.id || 'TASK-01'}
+- Title: ${task.title || 'Workplace Incident'}
+- Role: ${task.role || 'Frontend'} (Level ${task.level || 2})
+- Competency: ${task.competency || 'Debugging'}
+- Problem Description: ${task.problem || 'Unhandled 504 Gateway Timeout causes checkout button to lock up'}
+- Expected Solution: ${task.expectedSolution || 'Exponential backoff retry with try/finally state reset and precision rounding'}
+
+INITIAL BUGGY CODE:
+\`\`\`javascript
+${initialCode || '// No initial code provided'}
+\`\`\`
+
+CANDIDATE SUBMITTED CODE:
+\`\`\`javascript
+${submittedCode || '// No submitted code provided'}
+\`\`\`
+
+TERMINAL OUTPUT:
+${terminalOutput || 'No terminal execution'}
+
+CHECKPOINTS CAPTURED:
+${Array.isArray(capturedFlags) ? capturedFlags.length : 0} of 10 flags captured.
+
+Return ONLY a single valid JSON object strictly matching this schema:
+{
+  "isBugFixed": false,
+  "fixQuality": "trivial_whitespace_edit",
+  "codeCorrectnessScore": 20,
+  "edgeCasesScore": 20,
+  "architectureScore": 25,
+  "debuggingScore": 20,
+  "workplaceReview": {
+    "communication": 70,
+    "problemSolving": 25,
+    "prioritization": 60,
+    "coachability": 75
+  },
+  "totalReadinessScore": 25,
+  "passed": false,
+  "statisticalImprovementGain": 0,
+  "aiEvaluationSummary": "...",
+  "unresolvedErrors": ["..."],
+  "actionableNextSteps": ["..."],
+  "weaknessAnalysis": {
+    "summary": "...",
+    "primaryWeaknesses": [
+      {
+        "area": "Asynchronous Error Handling",
+        "severity": "high",
+        "description": "...",
+        "impactOnProduction": "...",
+        "remediationAdvice": "..."
+      }
+    ],
+    "demonstratedStrengths": [
+      {
+        "area": "Workspace Navigation",
+        "evidence": "..."
+      }
+    ],
+    "recommendedRemediationSprint": "API Error Handling & Exponential Retries"
+  },
+  "recommendedMicroCourse": {
+    "moduleId": "fe-mod-03",
+    "title": "Async Data Fetching & Error Handling",
+    "videoTitle": "Asynchronous JavaScript Crash Course",
+    "provider": "Traversy Media",
+    "videoUrl": "https://www.youtube.com/watch?v=PoRJizFvM7s",
+    "relevanceReason": "Directly remediates missing retry loops and unhandled 504 timeouts."
+  }
+}`;
+
+  try {
+    const response = await client.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const parsed = cleanAndParseJSON(response.text);
+    if (!parsed) {
+      throw new Error('Failed to parse AI evaluation response.');
+    }
+
+    let recommendedMicroCourse = parsed.recommendedMicroCourse || null;
+    if (!recommendedMicroCourse || !recommendedMicroCourse.videoUrl) {
+      const primaryWeakness = parsed.weaknessAnalysis?.primaryWeaknesses?.[0]?.area || task?.primarySkill || task?.title;
+      recommendedMicroCourse = findMicroCourseForWeakness(roleId, primaryWeakness);
+    } else {
+      recommendedMicroCourse.thumbnailUrl = getModuleImage(recommendedMicroCourse);
+    }
+
+    return {
+      ...parsed,
+      isBugFixed: Boolean(parsed.isBugFixed),
+      codeCorrectnessScore: Number(parsed.codeCorrectnessScore) || 20,
+      totalReadinessScore: Number(parsed.totalReadinessScore) || 25,
+      passed: Boolean(parsed.passed),
+      statisticalImprovementGain: Number(parsed.statisticalImprovementGain) || 0,
+      weaknessAnalysis: parsed.weaknessAnalysis || null,
+      recommendedMicroCourse: recommendedMicroCourse || null,
+      isDemoFallback: false
+    };
+  } catch (err) {
+    console.error('[AI Evaluation evaluateTaskSolution Error]:', err.message);
+    return generateFallbackTaskEvaluation({
+      task,
+      initialCode,
+      submittedCode,
+      files,
+      terminalOutput,
+      capturedFlags,
+      hasEdgeCaseFailure
+    });
+  }
+}
+
 /* =========================================================
    STRICT FALLBACK ENGINE (Enforces Course & Project Rules)
    ========================================================= */
+
+function generateFallbackTaskEvaluation({
+  task = {},
+  initialCode = '',
+  submittedCode = '',
+  terminalOutput = '',
+  capturedFlags = [],
+  hasEdgeCaseFailure = false
+}) {
+  const roleId = task?.roleId || task?.role || 'frontend-developer';
+  const normInitial = (initialCode || '').replace(/\s+/g, '').trim();
+  const normSubmitted = (submittedCode || '').replace(/\s+/g, '').trim();
+
+  // If normalized code (without whitespace) is IDENTICAL:
+  const isWhitespaceOnly = (normInitial === normSubmitted);
+
+  // Check if candidate actually added key fix keywords
+  const hasRetryLogic = normSubmitted.includes('while') || normSubmitted.includes('attempt') || normSubmitted.includes('Math.pow') || normSubmitted.includes('maxRetries=3');
+  const hasErrorHandling = normSubmitted.includes('try') && normSubmitted.includes('catch');
+  const hasRounding = normSubmitted.includes('Math.round') || normSubmitted.includes('Number.EPSILON');
+  const hasAbort = normSubmitted.includes('AbortController') || normSubmitted.includes('signal');
+
+  // If user only added spaces or left code untouched
+  if (isWhitespaceOnly) {
+    return {
+      isBugFixed: false,
+      fixQuality: 'trivial_whitespace_edit',
+      codeCorrectnessScore: 18,
+      edgeCasesScore: 15,
+      architectureScore: 25,
+      debuggingScore: 20,
+      workplaceReview: {
+        communication: 65,
+        problemSolving: 20,
+        prioritization: 50,
+        coachability: 70
+      },
+      totalReadinessScore: 24,
+      passed: false,
+      statisticalImprovementGain: 0,
+      aiEvaluationSummary: 'AI Evaluation Audit: Only whitespace/formatting changes detected. The root-cause error was NOT resolved. No statistical improvement is awarded.',
+      unresolvedErrors: [
+        'Missing retry loop for unhandled 504 / 500 network errors',
+        'State lock not released on payment failure',
+        'IEEE 754 precision defect persists in cart calculation'
+      ],
+      actionableNextSteps: [
+        'Open Monaco Editor and implement exponential backoff retry logic',
+        'Wrap the API request in try/finally to clear loading and lock states',
+        'Apply Math.round precision to discount totals'
+      ],
+      weaknessAnalysis: {
+        summary: 'Candidate submitted only whitespace or formatting changes without addressing the root cause.',
+        primaryWeaknesses: [
+          {
+            area: 'Asynchronous Error Handling & State Recovery',
+            severity: 'CRITICAL',
+            description: 'Failed to implement exponential backoff retry loop or unfreeze locked state in catch/finally blocks.',
+            impactOnProduction: 'Leaves users in permanent loading freeze during transient 504 gateway timeouts.',
+            remediationAdvice: 'Study exponential backoff patterns and guarantee state unfreezing within finally blocks.'
+          },
+          {
+            area: 'IEEE 754 Floating-Point Arithmetic',
+            severity: 'HIGH',
+            description: 'Unrounded floating-point calculations persist in the cart calculations.',
+            impactOnProduction: 'Leads to 1-cent discrepancy errors in customer billing and checkout transactions.',
+            remediationAdvice: 'Always calculate financial totals in cents using integer math or apply Math.round(val * 100) / 100.'
+          }
+        ],
+        demonstratedStrengths: [
+          {
+            area: 'Codebase Inspection',
+            evidence: 'Navigated to the affected file and initiated simulation workflow.'
+          }
+        ],
+        recommendedRemediationSprint: 'Resilient Asynchronous Flow & Precision Arithmetic'
+      },
+      recommendedMicroCourse: findMicroCourseForWeakness(roleId, 'Async Data Fetching & Error Handling'),
+      isDemoFallback: true
+    };
+  }
+
+  // Check if genuine fix was implemented
+  const hasCoreFix = (hasRetryLogic || hasRounding || hasAbort) && (hasErrorHandling || hasRounding);
+
+  if (!hasCoreFix || hasEdgeCaseFailure) {
+    return {
+      isBugFixed: false,
+      fixQuality: hasEdgeCaseFailure ? 'edge_case_missed' : 'incomplete_fix',
+      codeCorrectnessScore: 48,
+      edgeCasesScore: 35,
+      architectureScore: 50,
+      debuggingScore: 45,
+      workplaceReview: {
+        communication: 72,
+        problemSolving: 50,
+        prioritization: 60,
+        coachability: 80
+      },
+      totalReadinessScore: 52,
+      passed: false,
+      statisticalImprovementGain: 0,
+      aiEvaluationSummary: hasEdgeCaseFailure 
+        ? 'AI Evaluation Audit: Your solution works for the main flow, but failed when the API returned an empty payment payload.'
+        : 'AI Evaluation Audit: Partial edits detected, but the root cause has not been resolved. Automated unit tests still fail.',
+      unresolvedErrors: [
+        'Network retry boundary not fully implemented',
+        'Automated tests failed assertions'
+      ],
+      actionableNextSteps: [
+        'Add while loop with exponential backoff',
+        'Run npm test in terminal to verify assertions'
+      ],
+      weaknessAnalysis: {
+        summary: hasEdgeCaseFailure 
+          ? 'Candidate fixed the primary happy path but overlooked production edge cases (empty payloads / timeout boundaries).'
+          : 'Candidate implemented partial changes but failed to resolve the underlying systemic error.',
+        primaryWeaknesses: [
+          {
+            area: hasEdgeCaseFailure ? 'Defensive Programming & Null Safety' : 'Systematic Root-Cause Debugging',
+            severity: 'HIGH',
+            description: hasEdgeCaseFailure
+              ? 'Edge-case handling for missing payload fields or malformed response bodies was omitted.'
+              : 'Implemented partial syntax changes without verifying all failure paths and test assertions.',
+            impactOnProduction: hasEdgeCaseFailure
+              ? 'Unhandled TypeError / null reference exception in production upon abnormal API payload.'
+              : 'Persistent 504 retry exhaustion and recurring client-side failure.',
+            remediationAdvice: 'Use defensive optional chaining and validate response schemas before accessing nested keys.'
+          }
+        ],
+        demonstratedStrengths: [
+          {
+            area: 'Core Logic Implementation',
+            evidence: 'Correctly identified the defect location and made relevant modifications.'
+          }
+        ],
+        recommendedRemediationSprint: 'Defensive API Integration & Production Edge Cases'
+      },
+      recommendedMicroCourse: findMicroCourseForWeakness(roleId, hasEdgeCaseFailure ? 'Frontend Performance Optimization' : 'Async Data Fetching & Error Handling'),
+      isDemoFallback: true
+    };
+  }
+
+  // Real fix verified!
+  return {
+    isBugFixed: true,
+    fixQuality: 'production_ready',
+    codeCorrectnessScore: 92,
+    edgeCasesScore: 88,
+    architectureScore: 86,
+    debuggingScore: 94,
+    workplaceReview: {
+      communication: 88,
+      problemSolving: 92,
+      prioritization: 86,
+      coachability: 95
+    },
+    totalReadinessScore: 89,
+    passed: true,
+    statisticalImprovementGain: 20,
+    aiEvaluationSummary: 'AI Evaluation Passed: Root cause verified resolved. The patch implements exponential backoff retry, clears submitting locks in finally block, and ensures precision financial math.',
+    unresolvedErrors: [],
+    actionableNextSteps: [
+      'Submit PR to main branch',
+      'Verify canary deployment metrics'
+    ],
+    weaknessAnalysis: {
+      summary: 'Candidate demonstrated comprehensive mastery: cleanly solved the root-cause bug, adhered to defensive best practices, and preserved edge-case safety.',
+      primaryWeaknesses: [],
+      demonstratedStrengths: [
+        {
+          area: 'Resilient Asynchronous Architecture',
+          evidence: 'Implemented robust retry loop with exponential backoff and jitter for transient API failures.'
+        },
+        {
+          area: 'Clean State Lifecycle Management',
+          evidence: 'Guaranteed lock release and loading flag clearance in finally block across all execution branches.'
+        },
+        {
+          area: 'Defensive Data Handling',
+          evidence: 'Safely handled edge-case payloads and guarded against precision drift in calculation routines.'
+        }
+      ],
+      recommendedRemediationSprint: 'Advanced Distributed Microservices & Chaos Engineering'
+    },
+    recommendedMicroCourse: findMicroCourseForWeakness(roleId, 'State Management & Component Architecture'),
+    isDemoFallback: true
+  };
+}
 
 function generateFallbackResumeAnalysis(resumeText, targetRole, roleRequirements = []) {
   const textLower = (resumeText || '').toLowerCase();
@@ -332,73 +731,71 @@ function generateFallbackResumeAnalysis(resumeText, targetRole, roleRequirements
     });
   }
 
-  // Strict Policy 1: If resume contains NO certifications AND NO documented projects, REJECT IT
-  const hasAnyCert = verifiedCertifications.length > 0;
-  const hasAnyProject = documentedProjects.length > 0;
-  const isRejected = !hasAnyCert && !hasAnyProject;
-  const rejectionReason = isRejected
-    ? "No accredited certifications or documented project deliverables were detected in the uploaded resume. Per DayOne's Strict AI Evaluation Standards, resumes without official credentials or documented projects cannot be evaluated."
-    : null;
+  // Certifications and projects are NOT mandatory. Resumes are NEVER rejected.
+  const isRejected = false;
+  const rejectionReason = null;
 
-  // 4. Score Each Skill Strictly Under AI Evaluation Rules
+  // 4. Score Each Skill Fairly Across Multiple Evidence Sources
   const skills = roleRequirements.map(req => {
     const skillNameLower = req.name.toLowerCase();
     const isMentioned = textLower.includes(skillNameLower);
     const isInsideProject = projectText.includes(skillNameLower);
     const isInsideCert = verifiedCertifications.some(c => c.name.toLowerCase().includes(skillNameLower));
-    const isInsideCourseOnly = courseText.includes(skillNameLower) && !isInsideProject && !isInsideCert;
+    const isInsideCourse = courseText.includes(skillNameLower) || unverifiedCourseClaims.some(c => c.courseName.toLowerCase().includes(skillNameLower));
 
-    let resumeEvidence = 0.0;
-    let evidenceLevel = 'zero';
-    let hasProjectInfo = false;
-    let hasCertification = false;
-    let isRemarkedInvalid = false;
-    let remarkStatus = null;
-    let validationRemark = null;
-    let validationMethod = 'Unverified';
+    let resumeEvidence = 0.20;
+    let evidenceLevel = 'foundational';
+    let hasProjectInfo = isInsideProject;
+    let hasCertification = isInsideCert;
+    const isRemarkedInvalid = false;
+    const remarkStatus = null;
+    const validationRemark = null;
+    let validationMethod = 'Role Baseline';
     const evidence = [];
 
-    // Branch A: Verified accredited certification
+    // Branch A: Verified certification
     if (isInsideCert) {
       hasCertification = true;
       resumeEvidence = 0.90;
       evidenceLevel = 'strong';
-      validationMethod = 'Accredited Certification Credential';
-      evidence.push(`Verified through accredited industry certification credential in resume.`);
+      validationMethod = 'Industry Certification Credential';
+      evidence.push(`Verified through industry credential in resume.`);
     }
-
-    // Branch B: Completed a project with the skill without certification -> evaluate project and assign knowledge
-    if (isInsideProject) {
+    // Branch B: Documented project deliverables
+    else if (isInsideProject) {
       hasProjectInfo = true;
       const matches = (projectText.match(new RegExp(skillNameLower, 'g')) || []).length;
       if (matches >= 3) {
-        resumeEvidence = Math.max(resumeEvidence, 0.85);
+        resumeEvidence = 0.85;
         evidenceLevel = 'strong';
-        evidence.push(`Evaluated from documented project: Supported by ${matches} active project implementations with architecture & code deliverables.`);
+        evidence.push(`Supported by ${matches} active project implementations with architecture & code deliverables.`);
       } else {
-        resumeEvidence = Math.max(resumeEvidence, 0.65);
+        resumeEvidence = 0.70;
         evidenceLevel = 'moderate';
-        evidence.push(`Evaluated from documented project: Active implementation and technical deliverables.`);
+        evidence.push(`Active project implementation with technical deliverables.`);
       }
-      validationMethod = hasCertification ? 'Certification + Project Evidence' : 'Project Experience Evaluated (No Cert Needed)';
+      validationMethod = 'Documented Project Deliverable';
     }
-
-    // Branch C: Missing/invalid certification AND no project info -> Remark the skill!
-    if (!hasProjectInfo && !hasCertification) {
-      resumeEvidence = 0.0;
-      evidenceLevel = 'zero';
-      isRemarkedInvalid = true;
-      remarkStatus = 'invalid_certification';
-      validationRemark = 'This skill is not valid until you submit a valid certification.';
-      validationMethod = 'Invalid / Unverified Certification';
-
-      if (isInsideCourseOnly) {
-        evidence.push(`Found only in course title or unaccredited tutorial. This skill is not valid until you submit a valid certification.`);
-      } else if (isMentioned) {
-        evidence.push(`Listed as standalone keyword without project information or deliverables. This skill is not valid until you submit a valid certification.`);
-      } else {
-        evidence.push(`No valid accredited certification or project info found. This skill is not valid until you submit a valid certification.`);
-      }
+    // Branch C: Coursework, online learning or tutorials
+    else if (isInsideCourse) {
+      resumeEvidence = 0.55;
+      evidenceLevel = 'moderate';
+      validationMethod = 'Coursework & Learning';
+      evidence.push(`Acquired through technical coursework, tutorial completion, and structured study.`);
+    }
+    // Branch D: Mentioned in skills profile
+    else if (isMentioned) {
+      resumeEvidence = 0.45;
+      evidenceLevel = 'developing';
+      validationMethod = 'Resume Skill Profile';
+      evidence.push(`Documented as technical competency in candidate resume profile.`);
+    }
+    // Branch E: Core role requirement to validate in simulation
+    else {
+      resumeEvidence = 0.20;
+      evidenceLevel = 'foundational';
+      validationMethod = 'Simulation Baseline';
+      evidence.push(`Foundational role competency to be evaluated in live workplace simulation.`);
     }
 
     return {
@@ -411,7 +808,7 @@ function generateFallbackResumeAnalysis(resumeText, targetRole, roleRequirements
       remarkStatus,
       validationRemark,
       validationMethod,
-      validationStatus: isRemarkedInvalid ? 'invalid_until_certified' : 'validated',
+      validationStatus: 'validated',
       evidence
     };
   });

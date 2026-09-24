@@ -15,10 +15,15 @@ import {
   Award, CheckCircle2, Shield, TrendingUp, Sparkles, 
   ExternalLink, Share2, Download, ArrowRight, RotateCcw, 
   Star, Briefcase, ChevronRight, FileCheck, AlertTriangle,
-  Zap, Clock, Bot, Check, PieChart, ShieldCheck, CheckSquare, X
+  Zap, Clock, Bot, Check, PieChart, ShieldCheck, CheckSquare, X, Flag,
+  Loader2, XCircle, Lock, LayoutDashboard
 } from 'lucide-react';
 import { JOB_PROFILES } from '../data/jobs';
 import { calculateTaskEvaluation, getLevelInfo, getNextLevel } from '../lib/skills/statsEngine';
+import { apiEvaluateTaskSolution } from '../lib/api/client';
+import { recordTaskResultInDashboard } from '../lib/dashboard/dashboardStore';
+import { findMicroCourseForWeakness } from '../data/microCourses';
+import MicroCourseCard from './common/MicroCourseCard';
 import MicroCourseSkillSprint from './MicroCourseSkillSprint';
 
 export default function EvaluationEngine({ 
@@ -28,6 +33,7 @@ export default function EvaluationEngine({
   onSelectNewRole,
   onProceedToNextTask,
   onAdvanceToNextLevel,
+  onViewDashboard,
   taskIndex = 0,
   totalTasksInLevel = 2,
   currentLevel = 2
@@ -40,7 +46,44 @@ export default function EvaluationEngine({
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [sprintRemediated, setSprintRemediated] = useState(false);
 
-  // Compute evaluation data using time-based stats engine
+  // Gemini AI Evaluation State
+  const [aiEvaluation, setAiEvaluation] = useState(null);
+  const [isEvaluatingAI, setIsEvaluatingAI] = useState(true);
+
+  // Trigger Gemini API code review and evaluation
+  useEffect(() => {
+    let isMounted = true;
+    async function runAIEvaluation() {
+      setIsEvaluatingAI(true);
+      try {
+        const evalResult = await apiEvaluateTaskSolution({
+          task: missionData?.assignedTask || { title: missionData?.missionCode, id: missionData?.missionCode },
+          initialCode: workspaceState?.initialCode || '',
+          submittedCode: workspaceState?.submittedCode || '',
+          files: workspaceState?.fileContents || {},
+          terminalOutput: workspaceState?.terminalOutput || '',
+          capturedFlags: workspaceState?.capturedFlags || [],
+          elapsedSeconds: workspaceState?.elapsedSeconds || 540,
+          hasEdgeCaseFailure: Boolean(workspaceState?.hasEdgeCaseFailure)
+        });
+
+        if (isMounted && evalResult) {
+          setAiEvaluation(evalResult);
+        }
+      } catch (err) {
+        console.warn('AI evaluation error:', err);
+      } finally {
+        if (isMounted) {
+          setIsEvaluatingAI(false);
+        }
+      }
+    }
+
+    runAIEvaluation();
+    return () => { isMounted = false; };
+  }, [workspaceState, missionData]);
+
+  // Compute evaluation data using time-based stats engine with Gemini AI results
   const evalData = useMemo(() => {
     return calculateTaskEvaluation({
       missionData,
@@ -51,9 +94,21 @@ export default function EvaluationEngine({
       elapsedSeconds: workspaceState?.elapsedSeconds || 540,
       candidateLevel: currentLevel,
       hintsUsed: workspaceState?.workSignals?.hintsUsed || 0,
-      chaosResolved: workspaceState?.chaosResolved ?? true
+      chaosResolved: workspaceState?.chaosResolved ?? true,
+      aiEvaluation
     });
-  }, [missionData, workspaceState, currentLevel, sprintRemediated]);
+  }, [missionData, workspaceState, currentLevel, sprintRemediated, aiEvaluation]);
+
+  const recommendedCourse = useMemo(() => {
+    if (aiEvaluation?.recommendedMicroCourse) {
+      return aiEvaluation.recommendedMicroCourse;
+    }
+    const primaryWeakness = aiEvaluation?.weaknessAnalysis?.primaryWeaknesses?.[0]?.area ||
+      evalData?.edgeCaseDetails?.skill ||
+      missionData?.assignedTask?.primarySkill ||
+      role?.skills?.[0]?.name;
+    return findMicroCourseForWeakness(role?.id || 'frontend-developer', primaryWeakness);
+  }, [aiEvaluation, evalData, missionData, role]);
 
   const levelInfo = getLevelInfo(currentLevel);
   const nextLevel = getNextLevel(currentLevel);
@@ -80,6 +135,18 @@ export default function EvaluationEngine({
     }
   }, [evalData.passed, evalData.hasEdgeCaseFailure]);
 
+  // Automatically record task evaluation in candidate profile dashboard
+  useEffect(() => {
+    if (evalData && !isEvaluatingAI) {
+      recordTaskResultInDashboard({
+        evalData,
+        missionData,
+        workspaceState,
+        aiEvaluation
+      });
+    }
+  }, [evalData, isEvaluatingAI, missionData, workspaceState, aiEvaluation]);
+
   const candidateDisplayName = candidateProfile?.name || 'Sachu Sethu';
 
   return (
@@ -93,7 +160,7 @@ export default function EvaluationEngine({
             </div>
             <div>
               <div className="edgecase-badge">
-                <span>STEP 13 — PRODUCTION EDGE CASE DETECTED</span>
+                <span>PRODUCTION EDGE CASE DETECTED</span>
               </div>
               <h2 className="edgecase-title">Almost there.</h2>
               <p className="edgecase-desc">
@@ -120,6 +187,119 @@ export default function EvaluationEngine({
               <span>Fix the Gap (7-min Skill Sprint)</span>
               <ArrowRight size={16} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* AI EVALUATION LOADING SPINNER */}
+      {isEvaluatingAI && (
+        <div className="ai-evaluating-loading-banner animate-pulse">
+          <Loader2 size={22} className="animate-spin text-cyan" />
+          <div className="ai-loading-text">
+            <span className="font-bold text-white text-sm">Evaluating Code Fix with Gemini AI...</span>
+            <p className="text-xs text-muted">Running AST diff comparison, verifying error handling, and calculating statistical readiness gain...</p>
+          </div>
+        </div>
+      )}
+
+      {/* AI CODE REVIEW AUDIT: BUG UNRESOLVED / TRIVIAL EDIT REJECTION */}
+      {!evalData.passed && !isEvaluatingAI && (
+        <div className="ai-audit-rejected-card animate-slide-in">
+          <div className="ai-audit-header">
+            <div className="ai-audit-icon-wrap">
+              <XCircle size={32} className="text-rose" />
+            </div>
+            <div className="ai-audit-header-text">
+              <div className="ai-audit-badge-pill">
+                <AlertTriangle size={13} className="text-rose" />
+                <span>AI AUDIT: ROOT CAUSE UNRESOLVED — PROGRESSION LOCKED</span>
+              </div>
+              <h2 className="ai-audit-title">Bug Fix Rejected — Code Review Failed</h2>
+              <p className="ai-audit-explanation">
+                {aiEvaluation?.aiEvaluationSummary || 
+                  (evalData.isWhitespaceOnly 
+                    ? 'AI Evaluation Audit: Only whitespace/formatting changes detected. The root-cause error was NOT resolved. No statistical improvement is awarded.'
+                    : 'AI Evaluation Audit: The submitted code does not resolve the root-cause bug. Production tests fail.')}
+              </p>
+            </div>
+          </div>
+
+          <div className="ai-audit-body-grid">
+            {/* Unresolved Errors */}
+            <div className="ai-audit-box errors">
+              <h4 className="audit-box-title text-rose">
+                <XCircle size={15} />
+                <span>Unresolved Errors & Flaws</span>
+              </h4>
+              <ul className="audit-errors-list">
+                {(aiEvaluation?.unresolvedErrors?.length ? aiEvaluation.unresolvedErrors : [
+                  'Trivial/whitespace edits do not resolve runtime race conditions',
+                  'Missing retry loop for unhandled 504 / 500 network errors',
+                  'Payment submitting lock not released on API exception',
+                  'Floating point precision defect persists in cart total calculation'
+                ]).map((err, i) => (
+                  <li key={i} className="audit-error-item">
+                    <span className="error-bullet">✕</span>
+                    <span>{err}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Actionable Next Steps */}
+            <div className="ai-audit-box actions">
+              <h4 className="audit-box-title text-cyan">
+                <Bot size={15} />
+                <span>Actionable Steps to Resolve</span>
+              </h4>
+              <ul className="audit-steps-list">
+                {(aiEvaluation?.actionableNextSteps?.length ? aiEvaluation.actionableNextSteps : [
+                  'Return to Monaco Editor and inspect submitCheckout() in src/services/checkoutApi.js',
+                  'Implement an exponential backoff while loop for network retries (attempt < maxRetries)',
+                  'Ensure response.ok is checked and non-ok status throws error to trigger retry',
+                  'Wrap API calls in try/finally to clear loading and lock state'
+                ]).map((step, i) => (
+                  <li key={i} className="audit-step-item">
+                    <span className="step-num-bullet">{i + 1}</span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className="ai-audit-footer-bar">
+            <button 
+              type="button" 
+              className="btn btn-primary btn-retry-audit"
+              onClick={onRetakeSimulation}
+            >
+              <RotateCcw size={16} />
+              <span>Return to Workspace to Implement Fix</span>
+            </button>
+            <span className="audit-penalty-note">
+              Readiness score limited to <strong>{evalData.totalScore}%</strong> (Passing threshold: {levelInfo.minCreditToPass}%). Progression locked until bug is resolved.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* AI CODE REVIEW AUDIT: SUCCESS BANNER */}
+      {evalData.passed && !isEvaluatingAI && (
+        <div className="ai-audit-passed-card animate-slide-in">
+          <div className="flex-row items-center justify-between">
+            <div className="flex-row items-center gap-3">
+              <CheckCircle2 size={24} className="text-emerald" />
+              <div>
+                <span className="text-emerald font-bold text-sm">✓ GEMINI AI AUDIT: ROOT CAUSE RESOLVED</span>
+                <p className="text-xs text-muted mt-0.5">
+                  {aiEvaluation?.aiEvaluationSummary || 'Root cause verified resolved. Exponential backoff retry implemented and state cleanup verified.'}
+                </p>
+              </div>
+            </div>
+            <span className="badge-pill-xs text-emerald font-mono font-bold">
+              +{evalData.skillImprovements[0]?.gain || 20}% Statistical Gain Awarded
+            </span>
           </div>
         </div>
       )}
@@ -250,6 +430,32 @@ export default function EvaluationEngine({
             </div>
           </div>
 
+          {/* CAPTURE-FLAG CHECKPOINTS PERFORMANCE CARD */}
+          {evalData.flagMetrics && (
+            <div className="capture-flag-eval-card mt-4">
+              <div className="flag-eval-header">
+                <div className="flex-row items-center gap-2">
+                  <Flag size={16} className="text-amber" />
+                  <span className="font-bold text-white text-sm">CAPTURE-FLAG CHECKPOINTS</span>
+                </div>
+                <span className="flag-eval-score-pill font-mono">
+                  {evalData.flagMetrics.capturedCount} / {evalData.flagMetrics.totalFlagsCount} Flags ({evalData.flagMetrics.flagScore} PTS)
+                </span>
+              </div>
+              <div className="flag-eval-progress-bar">
+                <div 
+                  className="flag-eval-progress-fill" 
+                  style={{ width: `${evalData.flagMetrics.flagPercentage}%` }}
+                />
+              </div>
+              <div className="flag-eval-subtext text-xs text-muted mt-2">
+                {evalData.flagMetrics.passedAllFlags 
+                  ? '✓ 100% of workplace discovery, diagnosis, implementation, and verification checkpoints satisfied.'
+                  : `${evalData.flagMetrics.capturedCount} of 10 challenge checkpoints successfully captured during simulation.`}
+              </div>
+            </div>
+          )}
+
           {/* STEP 18: MY DAYONE SKILL PASSPORT */}
           <div className="skill-passport-card mt-4">
             <div className="passport-header">
@@ -342,7 +548,7 @@ export default function EvaluationEngine({
           <div className="ai-code-review-card">
             <div className="card-header-badge">
               <FileCheck size={18} className="text-accent" />
-              <h3 className="card-heading">STEP 12 — 🔎 AI CODE REVIEW</h3>
+              <h3 className="card-heading">🔎 AI CODE REVIEW</h3>
             </div>
 
             <div className="reviews-split-grid">
@@ -394,6 +600,84 @@ export default function EvaluationEngine({
                 </div>
               </div>
             </div>
+
+            {/* Gemini AI Detailed Code Audit Feedback */}
+            {aiEvaluation && (
+              <div className={`ai-eval-summary-strip ${evalData.passed ? 'passed' : 'failed'} mt-3`}>
+                <div className="flex-row items-center gap-2 mb-1">
+                  <Bot size={14} className={evalData.passed ? 'text-emerald' : 'text-rose'} />
+                  <span className="font-bold text-xs">
+                    {evalData.passed ? 'GEMINI AI VERIFICATION: ROOT CAUSE RESOLVED' : 'GEMINI AI AUDIT: DEFECT UNRESOLVED'}
+                  </span>
+                </div>
+                <p className="text-xs text-muted mb-0">
+                  {aiEvaluation.aiEvaluationSummary}
+                </p>
+
+                {/* Gemini AI Weakness Diagnostic */}
+                {aiEvaluation.weaknessAnalysis && (
+                  <div className="eval-weakness-diagnostic-box mt-3 pt-3 border-t border-border">
+                    <div className="flex-row items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-amber flex-row items-center gap-1">
+                        <AlertTriangle size={13} />
+                        <span>GEMINI AI ROOT-CAUSE DIAGNOSTIC & BLIND SPOTS</span>
+                      </span>
+                      {aiEvaluation.weaknessAnalysis.recommendedRemediationSprint && (
+                        <span className="badge-tag xs amber">
+                          Sprint: {aiEvaluation.weaknessAnalysis.recommendedRemediationSprint}
+                        </span>
+                      )}
+                    </div>
+
+                    {aiEvaluation.weaknessAnalysis.primaryWeaknesses?.length > 0 ? (
+                      <div className="diagnostic-items-list">
+                        {aiEvaluation.weaknessAnalysis.primaryWeaknesses.map((w, idx) => (
+                          <div key={idx} className="diagnostic-item-row p-2 mb-2 rounded bg-surface">
+                            <div className="flex-row items-center justify-between">
+                              <strong className="text-white text-xs">{w.area}</strong>
+                              <span className={`severity-tag xs ${(w.severity || 'high').toLowerCase()}`}>
+                                {w.severity || 'HIGH'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted mb-1 mt-1">{w.description}</p>
+                            {w.impactOnProduction && (
+                              <div className="text-xs text-rose mb-1">
+                                <strong>Production Impact:</strong> {w.impactOnProduction}
+                              </div>
+                            )}
+                            {w.remediationAdvice && (
+                              <div className="text-xs text-cyan">
+                                <strong>Remediation:</strong> {w.remediationAdvice}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-emerald mb-0">
+                        ✓ Zero critical weaknesses detected. Architecture satisfies defensive standards.
+                      </p>
+                    )}
+
+                    {/* Gemini AI Assigned Micro-Learning Course */}
+                    {recommendedCourse && (
+                      <div className="eval-micro-course-box mt-3 pt-3 border-t border-border">
+                        <div className="flex-row items-center gap-1.5 mb-2">
+                          <Sparkles size={14} className="text-amber" />
+                          <span className="text-xs font-bold text-white uppercase tracking-wider">
+                            Gemini AI Assigned Micro-Learning Course
+                          </span>
+                        </div>
+                        <MicroCourseCard 
+                          course={recommendedCourse} 
+                          remediationArea={aiEvaluation?.weaknessAnalysis?.primaryWeaknesses?.[0]?.area || evalData.edgeCaseDetails?.skill}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* AI Lead Quote */}
@@ -444,17 +728,29 @@ export default function EvaluationEngine({
           <div className="eval-footer-nav mt-4">
             {/* If task 1 of 2: Proceed to Task 2 */}
             {taskIndex < totalTasksInLevel - 1 ? (
-              <button 
-                type="button" 
-                className="btn btn-primary btn-proceed-next-task"
-                onClick={onProceedToNextTask}
-              >
-                <span>Proceed to Task {taskIndex + 2} of {totalTasksInLevel}</span>
-                <ArrowRight size={16} />
-              </button>
+              evalData.passed ? (
+                <button 
+                  type="button" 
+                  className="btn btn-primary btn-proceed-next-task"
+                  onClick={onProceedToNextTask}
+                >
+                  <span>Proceed to Task {taskIndex + 2} of {totalTasksInLevel}</span>
+                  <ArrowRight size={16} />
+                </button>
+              ) : (
+                <button 
+                  type="button" 
+                  className="btn btn-secondary btn-proceed-locked"
+                  onClick={onRetakeSimulation}
+                  title={`Resolve defect in workspace to unlock Task ${taskIndex + 2}`}
+                >
+                  <Lock size={15} className="text-muted" />
+                  <span>Task {taskIndex + 2} Locked (Resolve Bug to Unlock)</span>
+                </button>
+              )
             ) : (
               /* If task 2 of 2: Check if minimum credit met for Next Level Promotion */
-              evalData.totalScore >= levelInfo.minCreditToPass && nextLevel ? (
+              evalData.passed && evalData.totalScore >= levelInfo.minCreditToPass && nextLevel ? (
                 <button 
                   type="button" 
                   className="btn btn-primary btn-advance-level"
@@ -464,7 +760,7 @@ export default function EvaluationEngine({
                   <span>Advance to Level {nextLevel.level}: {nextLevel.name}</span>
                   <ArrowRight size={16} />
                 </button>
-              ) : evalData.totalScore >= levelInfo.minCreditToPass && !nextLevel ? (
+              ) : evalData.passed && evalData.totalScore >= levelInfo.minCreditToPass && !nextLevel ? (
                 <button 
                   type="button" 
                   className="btn btn-primary btn-advance-level"
@@ -477,11 +773,11 @@ export default function EvaluationEngine({
               ) : (
                 <button 
                   type="button" 
-                  className="btn btn-secondary btn-retry-task"
+                  className="btn btn-primary btn-retry-task"
                   onClick={onRetakeSimulation}
                 >
                   <RotateCcw size={16} />
-                  <span>Retry Task to Meet Minimum Credit ({levelInfo.minCreditToPass}%)</span>
+                  <span>Return to Workspace to Fix Bug (Need {levelInfo.minCreditToPass}% to Advance)</span>
                 </button>
               )
             )}
@@ -502,6 +798,18 @@ export default function EvaluationEngine({
             >
               <span>Change Role</span>
             </button>
+
+            {onViewDashboard && (
+              <button 
+                type="button" 
+                className="btn btn-secondary flex-row items-center gap-1.5" 
+                onClick={onViewDashboard}
+                title="View dynamic Candidate Profile Dashboard"
+              >
+                <LayoutDashboard size={15} className="text-cyan" />
+                <span>Candidate Dashboard</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

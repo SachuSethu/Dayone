@@ -44,8 +44,10 @@ export function normalizeRoleId(roleId) {
   return 'frontend';
 }
 
-// Master aggregation of all 192 main tasks with normalized roleId and competency
-export const ALL_TASKS = [
+import { attachCaptureFlagsToTasks, generateCaptureFlagsForTask } from './flags/captureFlagRegistry.js';
+
+// Master aggregation of all 192 main tasks with normalized roleId, competency, and 1,920 capture flags
+export const ALL_TASKS = attachCaptureFlagsToTasks([
   ...FRONTEND_TASKS,
   ...BACKEND_TASKS,
   ...FULLSTACK_TASKS,
@@ -56,13 +58,15 @@ export const ALL_TASKS = [
   const normRoleId = normalizeRoleId(task.roleId || task.role || task.applicableRoles?.[0]);
   const primaryCompetency = task.competency || (task.coreCompetencies && task.coreCompetencies[0]) || 'Software Engineering';
   const diffLabel = task.difficulty || (task.level === 1 ? 'Beginner' : task.level === 2 ? 'Intermediate' : task.level === 3 ? 'Professional' : 'Advanced');
+  const socAlias = task.id.startsWith('SEC-') ? task.id.replace('SEC-', 'SOC-') : null;
   return {
     ...task,
     roleId: normRoleId,
     competency: primaryCompetency,
-    levelLabel: task.levelLabel || `Level ${task.level}: ${diffLabel}`
+    levelLabel: task.levelLabel || `Level ${task.level}: ${diffLabel}`,
+    aliasId: task.aliasId || socAlias
   };
-});
+}));
 
 /**
  * 4-Level Architecture Definitions
@@ -89,17 +93,27 @@ export function getNextLevel(currentLevel) {
 export const TASK_DATABASE_STATS = {
   totalTasks: ALL_TASKS.length, // 192
   totalSubtasks: ALL_TASKS.reduce((acc, t) => acc + (t.subtasks?.length || 0), 0), // 384
+  totalCaptureFlags: ALL_TASKS.reduce((acc, t) => acc + (t.subtasks?.[0]?.flags?.length || 0) + (t.subtasks?.[1]?.flags?.length || 0), 0), // 1920
   rolesCount: 6,
   levelsPerRole: 4,
-  tasksPerLevel: 8
+  tasksPerLevel: 8,
+  flagsPerSubtask: 5,
+  flagsPerTask: 10
 };
 
 /**
- * Retrieves a single task by ID or aliasId
+ * Retrieves a single task by ID or aliasId (supports SOC- and SEC- interchangeably)
  */
 export function findTaskById(taskId) {
   if (!taskId) return ALL_TASKS[0];
-  return ALL_TASKS.find(t => t.id === taskId || t.aliasId === taskId) || ALL_TASKS[0];
+  const targetId = String(taskId).trim();
+  const normalizedSearch = targetId.startsWith('SOC-') ? targetId.replace('SOC-', 'SEC-') : targetId.replace('SEC-', 'SOC-');
+  return ALL_TASKS.find(t => 
+    t.id === targetId || 
+    t.id === normalizedSearch || 
+    t.aliasId === targetId || 
+    t.aliasId === normalizedSearch
+  ) || ALL_TASKS[0];
 }
 
 /**

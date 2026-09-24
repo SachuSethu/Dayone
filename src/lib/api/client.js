@@ -109,3 +109,27 @@ export async function apiCheckHealth() {
     return { status: 'offline', geminiConfigured: false, mode: 'local_client_fallback' };
   }
 }
+
+/**
+ * 6. Evaluate workplace task solution with Gemini AI
+ * Checks code diff, error resolution, edge cases, and calculates statistical improvement.
+ */
+export async function apiEvaluateTaskSolution(payload) {
+  try {
+    const res = await fetch('/api/ai/evaluate-task', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'AI task evaluation request failed.');
+    }
+    return data.data;
+  } catch (err) {
+    console.warn('[apiEvaluateTaskSolution Warning]:', err.message);
+    // Return structured fallback if backend fetch fails
+    return null;
+  }
+}

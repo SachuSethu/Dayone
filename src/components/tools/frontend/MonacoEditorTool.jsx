@@ -111,36 +111,55 @@ export function calculateCartTotal(items = [], discountCode = null) {
 
 export default function MonacoEditorTool({ onCodeUpdate, workspaceState }) {
   const [activeFile, setActiveFile] = useState('src/services/checkoutApi.js');
-  const [fileContents, setFileContents] = useState(INITIAL_FILES);
-  const [lintStatus, setLintStatus] = useState(workspaceState?.feCodePatched ? 'Passing' : 'Warnings Detected');
+  const [fileContents, setFileContents] = useState(workspaceState?.fileContents || INITIAL_FILES);
 
   const currentCode = fileContents[activeFile] || '';
-  const isPatched = fileContents['src/services/checkoutApi.js'].includes('maxRetries = 3');
+
+  const checkoutCode = fileContents['src/services/checkoutApi.js'] || '';
+  const initialCheckoutNorm = INITIAL_FILES['src/services/checkoutApi.js'].replace(/\s+/g, '');
+  const currentCheckoutNorm = checkoutCode.replace(/\s+/g, '');
+  const isWhitespaceOnly = (initialCheckoutNorm === currentCheckoutNorm);
+  const isPatched = !isWhitespaceOnly && (
+    (checkoutCode.includes('while') || checkoutCode.includes('attempt') || checkoutCode.includes('maxRetries = 3')) && 
+    checkoutCode.includes('catch')
+  );
+
+  const [lintStatus, setLintStatus] = useState(isPatched ? 'Passing' : 'Warnings Detected');
 
   const handleCodeChange = (e) => {
     const val = e.target.value;
-    setFileContents(prev => ({
-      ...prev,
+    const updatedFiles = {
+      ...fileContents,
       [activeFile]: val
-    }));
+    };
+    setFileContents(updatedFiles);
 
-    const patched = val.includes('maxRetries') || val.includes('Math.round');
+    // Precise patch verification:
+    const initialForActive = (INITIAL_FILES[activeFile] || '').replace(/\s+/g, '');
+    const currentNorm = val.replace(/\s+/g, '');
+    const isWhitespaceOrNoop = (initialForActive === currentNorm);
+
+    // Requires genuine retry loop or precision rounding logic
+    const hasRetry = (val.includes('while') || val.includes('attempt') || val.includes('maxRetries = 3')) && val.includes('catch');
+    const hasRounding = val.includes('Math.round') && (val.includes('100') || val.includes('EPSILON'));
+    const patched = !isWhitespaceOrNoop && (hasRetry || hasRounding);
+
+    setLintStatus(patched ? 'Passing (All Linters Green)' : 'Warnings Detected');
+
     if (onCodeUpdate) {
-      onCodeUpdate(patched, { ...fileContents, [activeFile]: val });
+      onCodeUpdate(patched, updatedFiles);
     }
   };
 
   const handleApplyPatch = () => {
-    setFileContents(prev => ({
-      ...prev,
+    const updated = {
+      ...fileContents,
       'src/services/checkoutApi.js': PATCHED_API_CODE
-    }));
+    };
+    setFileContents(updated);
     setLintStatus('Passing (All Linters Green)');
     if (onCodeUpdate) {
-      onCodeUpdate(true, {
-        ...fileContents,
-        'src/services/checkoutApi.js': PATCHED_API_CODE
-      });
+      onCodeUpdate(true, updated);
     }
   };
 

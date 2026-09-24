@@ -15,7 +15,7 @@ import {
   ChevronRight, ArrowRight, Shield, CheckCircle2, TrendingUp, 
   Layers, Clock, HelpCircle, Eye, Play, BarChart3, RefreshCw,
   GraduationCap, Briefcase, AlertOctagon, FileCode2, Info, BookOpen,
-  CheckSquare, Check
+  CheckSquare, Check, Flag, UserCheck, LayoutDashboard
 } from 'lucide-react';
 import { 
   selectAssignedTasksForCandidate, 
@@ -29,15 +29,16 @@ export default function CandidateProfileView({
   priorityGaps, 
   generatedMission,
   onStartSimulation,
-  onReset 
+  onReset,
+  onOpenDashboard 
 }) {
   const [selectedSkillForModal, setSelectedSkillForModal] = useState(null);
   const [chartViewMode, setChartViewMode] = useState('radar'); // 'radar' | 'barchart' | 'histogram' | 'bars'
   const [activeAssignedIndex, setActiveAssignedIndex] = useState(0);
 
-  // Filter skills flagged with invalid or missing certifications
+  // Skills evidence list
   const remarkedSkills = skillGaps.filter(g => g.isRemarkedInvalid || g.remarkStatus === 'invalid_certification');
-  const [showSkillRemarkModal, setShowSkillRemarkModal] = useState(remarkedSkills.length > 0);
+  const [showSkillRemarkModal, setShowSkillRemarkModal] = useState(false);
 
   // Compute Candidate Experience Level (1..4)
   const candidateLevel = determineCandidateLevel({
@@ -121,7 +122,30 @@ export default function CandidateProfileView({
           </div>
         </div>
 
-        <div className="user-nav-actions">
+        <div className="user-nav-actions flex-row items-center gap-2">
+          {onOpenDashboard && (
+            <button 
+              type="button" 
+              className="current-user-pill clickable"
+              onClick={onOpenDashboard}
+              title="Click to open your Candidate Account Dashboard"
+            >
+              <span className="user-icon">👤</span>
+              <span className="user-name">{candidateProfile?.candidateName || 'Candidate Profile'}</span>
+              <span className="user-dash-tag">Dashboard</span>
+            </button>
+          )}
+          {onOpenDashboard && (
+            <button 
+              type="button" 
+              className="btn btn-secondary btn-sm flex-row items-center gap-1.5"
+              onClick={onOpenDashboard}
+              title="Open Dynamic Candidate Dashboard"
+            >
+              <LayoutDashboard size={14} className="text-cyan" />
+              <span>Account Dashboard</span>
+            </button>
+          )}
           <button className="btn-reupload-subtle" onClick={onReset}>
             <RefreshCw size={13} />
             <span>Upload Another Resume</span>
@@ -131,13 +155,11 @@ export default function CandidateProfileView({
 
       {/* Main Content Area */}
       <div className="candidate-profile-container">
-        {/* Estimated Profile Disclaimer Notice */}
+        {/* Profile Standards Notice */}
         <div className="estimated-profile-disclaimer">
           <Shield size={18} className="disclaimer-shield-icon" />
           <div className="disclaimer-content">
-            <strong>Strict AI Evaluation Standards:</strong> Skills without documented project info or accredited certification 
-            credentials are scored at 0%. Course claims without official certificates are classified as unverified. 
-            Actual workplace proficiency is validated during DayOne’s live First-Day Simulation.
+            <strong>AI Evaluation Standards:</strong> DayOne analyzes documented skills, project experience, and accredited credentials to calculate your initial benchmark. Real-world workplace proficiency is validated dynamically during DayOne’s live First-Day Simulation.
           </div>
         </div>
 
@@ -655,11 +677,6 @@ export default function CandidateProfileView({
                       <td className="cell-skill-name">
                         <div className="skill-name-col">
                           <strong>{g.skill}</strong>
-                          {g.isRemarkedInvalid && (
-                            <span className="skill-remark-tag" title={g.validationRemark || "This skill is not valid until you submit a valid certification."}>
-                              ⚠️ Not Valid Until Certified
-                            </span>
-                          )}
                         </div>
                       </td>
                       <td className="cell-category">
@@ -680,12 +697,10 @@ export default function CandidateProfileView({
                           <span className="prov-basis-badge cert">🎓 Accredited Cert</span>
                         ) : g.hasProjectInfo ? (
                           <span className="prov-basis-badge proj">🛠️ Project Evaluated</span>
-                        ) : g.isRemarkedInvalid ? (
-                          <span className="prov-basis-badge invalid" title={g.validationRemark}>
-                            ⚠️ Needs Valid Cert
-                          </span>
+                        ) : g.evidenceLevel === 'moderate' || g.evidenceLevel === 'strong' ? (
+                          <span className="prov-basis-badge course">📚 Coursework / Study</span>
                         ) : (
-                          <span className="prov-basis-badge none">⚠️ No Project/Cert</span>
+                          <span className="prov-basis-badge none">📋 Skill Profile</span>
                         )}
                       </td>
                       <td className="cell-demand">
@@ -697,15 +712,9 @@ export default function CandidateProfileView({
                         </span>
                       </td>
                       <td className="cell-status">
-                        {g.isRemarkedInvalid ? (
-                          <span className="status-pill status-invalid-cert" title={g.validationRemark}>
-                            ⚠️ Invalid Until Certified
-                          </span>
-                        ) : (
-                          <span className={`status-pill ${g.alignmentStatus}`}>
-                            {isAligned ? 'Strong Alignment' : isDevOpp ? 'Development Area' : (isZero ? 'Zero Evidence' : 'Priority Gap')}
-                          </span>
-                        )}
+                        <span className={`status-pill ${g.alignmentStatus}`}>
+                          {isAligned ? 'Strong Alignment' : isDevOpp ? 'Development Area' : (isZero ? 'Foundational' : 'Priority Gap')}
+                        </span>
                       </td>
                       <td className="cell-actions">
                         <button 
@@ -879,7 +888,13 @@ export default function CandidateProfileView({
                 ]).map((st, sIdx) => (
                   <div key={st.id || sIdx} className="subtask-card">
                     <div className="subtask-card-header">
-                      <span className="subtask-step-pill">SUBTASK {sIdx === 0 ? 'A' : 'B'}</span>
+                      <div className="flex-row items-center gap-2">
+                        <span className="subtask-step-pill">SUBTASK {sIdx === 0 ? '1' : '2'}</span>
+                        <span className="subtask-flags-pill font-mono">
+                          <Flag size={11} className="text-amber" />
+                          <span>{st.flags?.length || 5} CAPTURE FLAGS (50 PTS)</span>
+                        </span>
+                      </div>
                       <h4 className="subtask-title">{st.title}</h4>
                     </div>
                     <p className="subtask-description">{st.description}</p>
