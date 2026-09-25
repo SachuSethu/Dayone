@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DayOne.ai - System Architecture</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap');
+    
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
+    .serif-heading {
+      font-family: 'Playfair Display', Georgia, serif;
+    }
+
+    .arch-card {
+      transition: all 0.2s ease-in-out;
+    }
+    
+    .arch-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.1), 0 8px 10px -6px rgba(59, 130, 246, 0.1);
+    }
+  </style>
+</head>
+<body class="bg-transparent text-[#1e293b] antialiased p-4 sm:p-8 flex justify-center">
+
+  <div class="w-full max-w-4xl bg-white border border-slate-100 rounded-2xl p-8 sm:p-12 shadow-sm">
+    
+    <!-- HEADER -->
+    <div class="mb-8">
+      <div class="text-xs font-bold tracking-widest text-[#2563eb] uppercase mb-2">
+        SYSTEM ARCHITECTURE
+      </div>
+      <h1 class="serif-heading text-4xl sm:text-5xl font-bold text-[#0f172a] tracking-tight">
+        Under the Hood
+      </h1>
+    </div>
+
+    <!-- CARDS CONTAINER -->
+    <div class="flex flex-col items-center w-full space-y-2">
+
+      <!-- 1. FRONTEND -->
+      <div class="arch-card w-full bg-[#f8faff] border-2 border-[#dbeafe] rounded-2xl p-5 flex items-center gap-5">
+        <div class="w-14 h-14 rounded-2xl bg-[#eff6ff] border border-[#bfdbfe] flex items-center justify-center shrink-0 text-[#2563eb]">
+          <!-- Grid Icon -->
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+            <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs font-extrabold uppercase tracking-wider text-[#2563eb]">FRONTEND</span>
+          <span class="text-slate-700 font-medium text-base mt-0.5">
+            React 19 <span class="text-slate-400 mx-1.5">•</span> Vite <span class="text-slate-400 mx-1.5">•</span> Recharts <span class="text-slate-400 mx-1.5">•</span> Framer Motion
+          </span>
+        </div>
+      </div>
+
+      <!-- DOWN ARROW -->
+      <div class="text-[#3b82f6] text-xl font-bold py-0.5 select-none animate-pulse">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <polyline points="19 12 12 19 5 12"></polyline>
+        </svg>
+      </div>
+
+      <!-- 2. API LAYER (HIGHLIGHTED PURPLE) -->
+      <div class="arch-card w-full bg-[#faf5ff] border-2 border-[#8b5cf6] rounded-2xl p-5 flex items-center gap-5 shadow-sm">
+        <div class="w-14 h-14 rounded-2xl bg-[#f3e8ff] border border-[#ddd6fe] flex items-center justify-center shrink-0 text-[#7c3aed]">
+          <!-- Server / Stacked Rectangles Icon -->
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="6" rx="2"></rect>
+            <rect x="2" y="14" width="20" height="6" rx="2"></rect>
+            <line x1="6" y1="7" x2="6.01" y2="7"></line>
+            <line x1="6" y1="17" x2="6.01" y2="17"></line>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs font-extrabold uppercase tracking-wider text-[#7c3aed]">API LAYER</span>
+          <span class="text-slate-700 font-medium text-base mt-0.5">
+            Node.js <span class="text-slate-400 mx-1.5">•</span> Express 5 <span class="text-slate-400 mx-1.5">•</span> REST APIs
+          </span>
+        </div>
+      </div>
+
+      <!-- DOWN ARROW -->
+      <div class="text-[#8b5cf6] text-xl font-bold py-0.5 select-none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <polyline points="19 12 12 19 5 12"></polyline>
+        </svg>
+      </div>
+
+      <!-- 3. AI LAYER -->
+      <div class="arch-card w-full bg-[#f8faff] border-2 border-[#3b82f6] rounded-2xl p-5 flex items-center gap-5">
+        <div class="w-14 h-14 rounded-2xl bg-[#eff6ff] border border-[#bfdbfe] flex items-center justify-center shrink-0 text-[#2563eb]">
+          <!-- Brain / AI Chip Icon -->
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"></path>
+            <path d="M9 21h6"></path>
+            <line x1="12" y1="11" x2="12" y2="15"></line>
+            <line x1="10" y1="13" x2="14" y2="13"></line>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs font-extrabold uppercase tracking-wider text-[#2563eb]">AI LAYER</span>
+          <span class="text-slate-800 font-semibold text-base mt-0.5">
+            Google Gemini 2.5 Flash
+          </span>
+        </div>
+      </div>
+
+      <!-- DOWN ARROW -->
+      <div class="text-[#3b82f6] text-xl font-bold py-0.5 select-none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <polyline points="19 12 12 19 5 12"></polyline>
+        </svg>
+      </div>
+
+      <!-- 4. SERVICES -->
+      <div class="arch-card w-full bg-[#f8faff] border-2 border-[#dbeafe] rounded-2xl p-5 flex items-center gap-5">
+        <div class="w-14 h-14 rounded-2xl bg-[#eff6ff] border border-[#bfdbfe] flex items-center justify-center shrink-0 text-[#2563eb]">
+          <!-- Layers Icon -->
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs font-extrabold uppercase tracking-wider text-[#2563eb]">SERVICES</span>
+          <span class="text-slate-700 font-medium text-sm sm:text-base mt-0.5 leading-relaxed">
+            Resume Extraction <span class="text-slate-400 mx-1">•</span> 
+            Skill Analysis <span class="text-slate-400 mx-1">•</span> 
+            Gap Analysis <span class="text-slate-400 mx-1">•</span> 
+            Mission Generation <span class="text-slate-400 mx-1">•</span> 
+            Task Evaluation <span class="text-slate-400 mx-1">•</span> 
+            Job Recommendation
+          </span>
+        </div>
+      </div>
+
+      <!-- DOWN ARROW -->
+      <div class="text-[#3b82f6] text-xl font-bold py-0.5 select-none">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <polyline points="19 12 12 19 5 12"></polyline>
+        </svg>
+      </div>
+
+      <!-- 5. STATE / STORAGE -->
+      <div class="arch-card w-full bg-[#f8faff] border-2 border-[#dbeafe] rounded-2xl p-5 flex items-center gap-5">
+        <div class="w-14 h-14 rounded-2xl bg-[#eff6ff] border border-[#bfdbfe] flex items-center justify-center shrink-0 text-[#2563eb]">
+          <!-- Database Cylinder Icon -->
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xs font-extrabold uppercase tracking-wider text-[#2563eb]">STATE / STORAGE</span>
+          <span class="text-slate-700 font-medium text-base mt-0.5">
+            HTML5 LocalStorage <span class="text-slate-400 mx-1.5">•</span> Synchronized Application State
+          </span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FOOTER BADGES -->
+    <div class="mt-8 pt-6 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-3">
+      <div class="flex items-center gap-2">
+        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+        <span class="font-semibold text-slate-700">DayOne.ai</span> Architecture Specification
+      </div>
+      <div>Designed for 12–15 Slide Hackathon Presentation Deck</div>
+    </div>
+
+  </div>
+
+</body>
+</html>
